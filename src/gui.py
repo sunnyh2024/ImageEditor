@@ -5,20 +5,22 @@ from PyQt5.QtWidgets import *
 
 
 class Window(QMainWindow):
-    def __init__(self, parent = None):
+    def __init__(self, parent=None):
         super().__init__(parent)
 
         self.setWindowTitle("PyEditor")
         self.setGeometry(100, 100, 500, 300)
+
         self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
+
         self.gridLayout = QGridLayout(self.centralWidget)
+        self.gridLayout.setColumnStretch(0, 1)
 
         self.createMenuBar()
         self.createImagePanel()
         self.createDrawPanel()
         self.createLayerPanel()
-        
 
     def createMenuBar(self):
         """Creates the top menu bar with the File, Image, Draw and Help Menus"""
@@ -31,6 +33,10 @@ class Window(QMainWindow):
         fileMenu.addAction("&Save As")
         fileMenu.addAction("&Save Project")
         fileMenu.addAction("&Quit")
+
+        editMenu = QMenu("&Edit", self)
+        menuBar.addMenu(editMenu)
+        editMenu.addAction("&Resize")
 
         imageMenu = QMenu("&Image", self)
         menuBar.addMenu(imageMenu)
@@ -53,7 +59,6 @@ class Window(QMainWindow):
         pixmap = QPixmap('amongus.png')
         imageLabel.setPixmap(pixmap)
         self.gridLayout.addWidget(imageLabel, 0, 0, 3, 1)
-        self.gridLayout.setColumnStretch(0, 1)
 
     def createDrawPanel(self):
         drawPanel = QWidget(self)
@@ -61,38 +66,48 @@ class Window(QMainWindow):
         drawPanel.setLayout(drawLayout)
 
         tabs = QTabWidget()
+
         filterTab = QWidget()
+        filterLayout = QVBoxLayout(filterTab)
+
+        scroll = QScrollArea(filterTab)
+        scroll.setWidgetResizable(True)
+        scrollContent = QWidget(scroll)
+        scrollLayout = QVBoxLayout(scrollContent)
+
+        filters = ['Blur', 'Sharpen', 'Sepia', 'Grayscale', 'Mosaic', ]
+
+        filterLayout.addWidget(scroll)
+
+        apply = QPushButton("Apply", filterTab)
+        apply.setFixedSize(75, 25)
+        filterLayout.addWidget(apply)
+
         drawTab = QWidget()
+
         tabs.addTab(filterTab, "Filter")
         tabs.addTab(drawTab, "Draw")
         drawLayout.addWidget(tabs)
-        self.gridLayout.addWidget(drawPanel, 0, 4, 1, 1)
 
-        apply = QPushButton("Apply")
-        apply.setFixedSize(75, 25)
-        drawLayout.addWidget(apply)
-        self.gridLayout.setColumnStretch(0, 1)
+        self.gridLayout.addWidget(drawPanel, 0, 1)
 
     def createLayerPanel(self):
         layerPanel = QWidget(self)
         layerLayout = QVBoxLayout(layerPanel)
 
         tab = QTabWidget()
-        tabLayout = QVBoxLayout()
-        tab.setLayout(tabLayout)
-        layerTab = QWidget()
-        layerList = QListWidget()
+
+        layerTab = QWidget(tab)
+        layerTabLayout = QVBoxLayout(layerTab)
+
+        layerList = QListWidget(layerTab)
+        layerList.move(10, 20)
+        layerTabLayout.addWidget(layerList)
 
         tab.addTab(layerTab, "Layers")
         layerLayout.addWidget(tab)
-        tabLayout.addWidget(layerList)
-        layerList.set
-        self.gridLayout.addWidget(layerPanel, 1, 4, 1, 1)
 
-        layer1 = QListWidgetItem(self.createLayerWidget(1))
-        layerList.addItem(layer1)
-
-        self.gridLayout.setColumnStretch(0, 1)
+        self.gridLayout.addWidget(layerPanel, 1, 1)
 
     def createLayerWidget(self, index):
         layer = QWidget()
@@ -111,10 +126,12 @@ class Window(QMainWindow):
         layout.addWidget(delete)
         return layer
 
+
 def test():
     app = QApplication(sys.argv)
     window = Window()
     window.show()
     sys.exit(app.exec_())
+
 
 test()

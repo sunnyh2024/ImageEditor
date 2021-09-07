@@ -1,4 +1,8 @@
 import copy
+from PIL import Image, ImageFilter, ImageOps
+import random as rand
+import numpy as np
+from utils import getDistance
 
 
 class GUIEditorModel:
@@ -9,11 +13,11 @@ class GUIEditorModel:
         self.visibilityIdentifiers = []
         self.currentLayer = -1
         if len(images) > 0:
-            self.height = len(images[0])
-            self.width = len(images[0][0])
+            self.height = images[0].height
+            self.width = images[0].width
             for image in images:
                 """Add checkImageRect method"""
-                if len(image) != self.height or len(image[0]) != self.width:
+                if image.height != self.height or image.width != self.width:
                     raise ValueError("Images must have the same dimensions")
                 self.layers.append(image)
                 self.visibilityIdentifiers.append(True)
@@ -22,8 +26,8 @@ class GUIEditorModel:
     def getAllImages(self):
         """
         Returns
-        ============
-            deep copy of all the images in this model, in the same order as the model.
+        ============ 
+        deep copy of all the images in this model, in the same order.
         """
         ans = []
         for image in self.layers:
@@ -33,34 +37,33 @@ class GUIEditorModel:
         """
         Returns
         ============ 
-            deep copy of the image at the given index in this model.
+        deep copy of the image at the given index in this model.
         """
         return copy.deepcopy(self.layers[index])
 
     def getTopMost(self):
-        """Returns a deep copy of the topmost visible image in this model."""
+        """
+        Returns
+        ============ 
+        deep copy of the topmost visible image in this model.
+        """
         for i in range(len(self.layers), 0, -1):
             if self.visibilityIdentifiers[i]:
                 return self.getImageAt(i)
 
     def getLayerVisibility(self):
         """
-        Returns 
+        Returns
         ============ 
-            deep copy of the layer visiblity list
+        deep copy of the layer visiblity list
         """
         return copy.deepcopy(self.visibilityIdentifiers)
 
     def addImage(self, image):
         """
-        Parameters
-        ============ 
-        image:
-            image in the PIL RGB format
-
         Adds the given image to this model above the current selected layer.
         """
-        if len(self.layers) == 0 or len(image) == self.height or len(image[0]) == self.width:
+        if len(self.layers) == 0 or image.height == self.height or image.width == self.width:
             if len(self.layers) == 0:
                 self.height = len(image)
                 self.width = len(image[0])
@@ -71,53 +74,234 @@ class GUIEditorModel:
             raise ValueError("Images must have the same dimensions")
 
     def removeImage(self):
-        """Removes the selected image layer from the list of image layers"""
+        """
+        Removes the selected image layer from the list of image layers.
+        """
         if self.currentLayer == -1:
             return
         else:
             self.layers.remove(self.currentLayer)
             self.currentLayer -= 1
 
+    def removeAllImages(self):
+        """
+        Removes all the images from this model above
+        """
+        self.layers.clear()
+        self.visibilityIdentifiers.clear()
+        self.currentLayer = -1
+
     def selectLayer(self, index):
-        """Selects an image layer to manipulate"""
+        """
+        Parameters
+        ============ 
+        index:
+            integer representing the index of the image layer in the model
+        
+        Selects the given image layer to manipulate
+        """
         if index > len(self.layers) or index < 0:
             raise ValueError("Index out of bounds")
         self.currentLayer = index
 
     def changeVisibility(self):
-        """Flips the visibility of this model's selected layer."""
+        """
+        Flips the visibility of this model's selected layer.
+        """
         self.visibilityIdentifiers[self.currentLayer] = not self.visibilityIdentifiers[self.currentLayer]
 
+    def grayscale(self):
+        """
+        Grayscales the model's selected layer.
+        """
+        self.layers[self.currentLayer] = ImageOps.grayscale(
+            self.layers[self.currentLayer])
 
-class Pixel:
-    """Represents a pixel in an image with the given RGB values."""
+    def sepia(self):
+        """
+        Applies a sepia filter to this model's selected layer.
+        """
+        # https://stackoverflow.com/questions/36434905/processing-an-image-to-sepia-tone-in-python
+        img = self.getImageAt(self.currentLayer)
+        ansImg = np.array(self.getImageAt(self.currentLayer))
+        for i in range(self.height):
+            for j in range(self.width):
+                r, g, b = img.getpixel((j, i))
+                newR = int(0.393 * r + 0.769 * g + 0.189 * b)
+                newG = int(0.349 * r + 0.686 * g + 0.168 * b)
+                newB = int(0.272 * r + 0.534 * g + 0.131 * b)
 
-    def __init__(self, r, g, b):
-        if (r < 0 or r > 255 or g < 0 or g > 255 or b < 0 or b > 255):
-            raise ValueError(
-                "At least one of the given values is not a valid color value")
-        self.r = r
-        self.g = g
-        self.b = b
+                if newR > 255:
+                    newR = 255
+                if newR < 0:
+                    newR = 0
+                if newG > 255:
+                    newG = 255
+                if newG < 0:
+                    newG = 0
+                if newB > 255:
+                    newB = 255
+                if newB < 0:
+                    newB = 0
+                ansImg[i, j] = (newR, newG, newB)
+        self.layers[self.currentLayer] = Image.fromarray(ansImg)
 
-    def __eq__(self, other):
-        """Returns whether the given other pixel is the same color as self"""
-        if type(other) != Pixel:
-            return False
-        return self.r == other.r and self.g == other.g and self.b == other.b
+    def blur(self):
+        """
+        Blurs this model's selected layer.
+        """
+        self.layers[self.currentLayer] = self.layers[self.currentLayer].filter(
+            ImageFilter.BLUR)
 
-    def __hash__(self):
-        """returns the hashcode of self"""
-        return hash(self.r, self.g, self.b)
+    def sharpen(self):
+        """
+        Sharpens this model's selected layer.
+        """
+        self.layers[self.currentLayer] = self.layers[self.currentLayer].filter(
+            ImageFilter.SHARPEN)
 
-# def checkImageRect(image):
-#     if len(image) == 0 or len(image[0] == 0):
-#         raise ValueError("Given image is empty")
-#     firstRowSize = len(image[0])
+    def downscale(self, targetHeight, targetWidth):
+        """
+        Parameters:
+        ============ 
+        targetHeight:
+            the height (in pixels) that the images will be after the downsize
+        targetWidth:
+            the width (in pixels) that the images will be after the downsize
+        
+        Downscales the layers in this model to the targetWidth and targetHeight.
+        """
+        if targetHeight < 0 or targetHeight > self.height or targetWidth < 0 or targetWidth > self.width:
+            raise ValueError("At least one target is invalid")
+        self.height = targetHeight
+        self.width = targetWidth
+        for i in range(len(self.layers)):
+            self.layers[i] = self.getImageAt(i).resize((targetWidth, targetHeight))
 
-#     for row in image:
-#         if len(row) != firstRowSize:
-#             raise ValueError("Given image is not rectangular")
-#         for pixel in row:
-#             if pixel == null:
+    def mosaic(self, numSeeds):
+        """
+        Applies a mosaic filter to this model's selected layer.
+        """
+        img = self.layers[self.currentLayer]
+        seeds = self.getSeeds(numSeeds)
+        clusters = self.getClusters(seeds, img)
+        avgRGB = self.getAvgRGB(clusters, seeds, img)
+
+        ansImg = np.array(self.getImageAt(self.currentLayer))
+        for i in range(self.height):
+            for j in range(self.width):
+                cluster = clusters[j][i][0]
+                rgb = avgRGB[cluster]
+                ansImg[j, i] = (rgb[0], rgb[1], rgb[2])
+        self.layers[self.currentLayer] = Image.fromarray(ansImg)
+
+    def getAvgRGB(self, clusters, seeds, image):
+        """
+        Parameters:
+        ============ 
+        clusters:
+            double array of integers that represents the cluster number of the corresponding pixel
+        seeds:
+            List of tuples that represent the posns of the pixel seeds in the image
+        image:
+            PIL image that will be mosaic-ed
+        
+        Returns:
+        ============ 
+        Dictionary that maps each cluster to the to the average color of that cluster.
+        """
+        width, height = image.size
+        averages = {}
+        clusterColors = []
+
+        for sdIndex in range(len(seeds)):
+            totalPixels = 0
+            clusterColors.append([0, 0, 0])
+            for i in range(height):
+                for j in range(width):
+                    if clusters[i][j][0] == sdIndex:
+                        r, g, b = image.getpixel((j, i))
+                        clusterColors[sdIndex][0] += r
+                        clusterColors[sdIndex][1] += g
+                        clusterColors[sdIndex][2] += b
+                        totalPixels += 1
+            avgR = clusterColors[sdIndex][0] // totalPixels
+            avgG = clusterColors[sdIndex][1] // totalPixels
+            avgB = clusterColors[sdIndex][2] // totalPixels
+            averages[sdIndex] = (avgR, avgG, avgB)
+        return averages
+
+    def getClusters(self, seeds, image):
+        """
+        Parameters:
+        ============ 
+        seeds:
+            list of tuples that represent the positions of the seeds in the form (x, y)
+        image:
+            PIL image that will used to generate the seeds
+        
+        Returns:
+        ============ 
+        Double array of integers that represents the seed that each corresponding pixel is closest to."""
+        width, height = image.size
+        clusters = []
+        for i in range(height):
+            clusters.append([])
+            for j in range(width):
+                clusters[i].append([])
+                currPosn = (j, i)
+                cluster = 0
+                minDist = getDistance(currPosn, seeds[0])
+
+                for k in range(len(seeds)):
+                    tempDist = getDistance(currPosn, seeds[k])
+                    if tempDist < minDist:
+                        minDist = tempDist
+                        cluster = k
+                clusters[i][j].append(cluster)
+        return clusters
+
+    def getSeeds(self, numSeeds):
+        """
+        Parameters:
+        ============ 
+        numSeeds:
+            the number of seeds that will be generated
+
+        Returns:
+        ============ 
+        List of tuples representing the position of each seed in the model's selected image
+        """
+        seeds = []
+        found = 0
+        while found < numSeeds:
+            posn = (rand.randrange(self.width), rand.randrange(self.height))
+            if not posn in seeds:
+                seeds.append(posn)
+                found += 1
+        return seeds
+        
+    
+    def verticalFlip(self):
+        """
+        Flips the current image vertically
+        """
+        self.layers[self.currentLayer] = self.getImageAt[self.currentLayer].transpose(Image.FLIP_TOP_BOTTOM)
+    
+    def horizontalFlip(self):
+        """
+        Flips the cirrent image horizontally
+        """
+        self.layers[self.currentLayer] = self.getImageAt[self.currentLayer].transpose(Image.FLIP_LEFT_RIGHT)
+
+    def rotateAll90(self):
+        """
+        Rotates all images by 90 degress counterclockwise
+        """
+        for i in range(len(self.layers)):
+            self.layers[i] = self.getImageAt(i).rotate(90)
+        temp = self.width
+        self.width = self.height
+        self.height = temp
+
 
