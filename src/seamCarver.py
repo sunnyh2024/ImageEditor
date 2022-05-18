@@ -17,13 +17,13 @@ class SeamInfo:
 
 def getEnergyMap(image):
     """creates a map of the energies of each pixel
-    The outer array in the map represents the x coordinates (columns)"""
+    The outer array in the map represents the y coordinates (rows)"""
     shape = image.shape
     map = []
-    for i in range(shape[0]):
+    for i in range(shape[1]):
         map.append([])
-        for j in range(shape[1]):
-            tl, t, tr, l, r, dl, d, dr = getNeighbors(image, i, j)
+        for j in range(shape[0]):
+            tl, t, tr, l, r, dl, d, dr = getNeighbors(image, j, i)
             map[i].append(getEnergy(tl, t, tr, l, r, dl, d, dr))
     return np.array(map)
 
@@ -40,21 +40,21 @@ def getNeighbors(image, x, y):
     shape = image.shape
     tl, t, tr, l, r, dl, d, dr = (0, 0, 0, 0, 0, 0, 0, 0)
     if y != 0:
-        t = getBrightness(image[x][y - 1])
+        t = getBrightness(image[y - 1][x])
         if x != 0:
-            tl = getBrightness(image[x - 1][y - 1])
-        if x != shape[0] - 1:
-            tr = getBrightness(image[x + 1][y - 1])
-    if y != shape[1] - 1:
-        d = getBrightness(image[x][y + 1])
+            tl = getBrightness(image[y - 1][x - 1])
+        if x != shape[1] - 1:
+            tr = getBrightness(image[y - 1][x + 1])
+    if y != shape[0] - 1:
+        d = getBrightness(image[y + 1][x])
         if x != 0:
-            dl = getBrightness(image[x - 1][y + 1])
-        if x != shape[0] - 1:
-            dr = getBrightness(image[x + 1][y + 1])
+            dl = getBrightness(image[y + 1][x - 1])
+        if x != shape[1] - 1:
+            dr = getBrightness(image[y + 1][x + 1])
     if x != 0:
-        l = getBrightness(image[x - 1][y])
-    if x != shape[0] - 1:
-        r = getBrightness(image[x + 1][y])
+        l = getBrightness(image[y][x - 1])
+    if x != shape[1] - 1:
+        r = getBrightness(image[y][x + 1])
     return tl, t, tr, l, r, dl, d, dr
 
 
@@ -69,18 +69,18 @@ def findLowestSeam(image, dir):
     energyMap = getEnergyMap(image)
     shape = energyMap.shape
     if (dir):
-        for j in range(shape[1]):
-            seams.append(SeamInfo(energyMap[0][j], j))
-        for i in range(shape[0] - 1):
-            for j in range(shape[1]):
-                weight, posn = findLowestEnergyHoriz(energyMap, (i, j))
+        for j in range(shape[0]):
+            seams.append(SeamInfo(energyMap[j][0], j))
+        for i in range(shape[1] - 1):
+            for j in range(shape[0]):
+                weight, posn = findLowestEnergyHoriz(energyMap, (j, i))
                 seams[j].add(weight, posn[1])
     else:
-        for i in range(shape[0]):
-            seams.append(SeamInfo(energyMap[i][0], i))
-        for j in range(shape[1] - 1):
-            for i in range(shape[0]):
-                weight, posn = findLowestEnergyVert(energyMap, (i, j))
+        for i in range(shape[1]):
+            seams.append(SeamInfo(energyMap[0][i], i))
+        for j in range(shape[0] - 1):
+            for i in range(shape[1]):
+                weight, posn = findLowestEnergyVert(energyMap, (j, i))
                 seams[j].add(weight, posn[0])
     weights = [seam.weight for seam in seams]
     return seams[weights.index(min(weights))].pixels
@@ -97,6 +97,8 @@ def findLowestEnergyHoriz(energyMap, posn):
     nextEnergies[energyMap[i + 1, j]] = (j, i + 1)
     key = min(nextEnergies.keys())
     return key, nextEnergies[key]
+
+
 
 
 def findLowestEnergyVert(energyMap, posn):
