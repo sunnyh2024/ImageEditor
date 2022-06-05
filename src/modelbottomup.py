@@ -8,7 +8,7 @@ from utils import getDistance
 class GUIEditorModel:
     """
     Represents a GUI model that contains an array of editable images.
-    For the array, the first image will be the topmost in the project, and the last image will be the bottommost
+    For the array, the first image will be the bottommost in the project, and the last image will be the topmost
     """
 
     def __init__(self, *images):
@@ -27,14 +27,6 @@ class GUIEditorModel:
                 self.currentLayer += 1
 
     def getSize(self):
-        """
-        Returns
-        ============ 
-        tuple representing the width and the height of the images in the current project.
-        (defaults to 512 pixels)
-        """
-        if not (self.width and self.height):
-            self.width = self.height = 512
         return self.width, self.height
 
     def getAllImages(self):
@@ -62,9 +54,9 @@ class GUIEditorModel:
         ============ 
         deep copy of the topmost visible image in this model.
         """
-        for i in range(len(self.layers)):
-            if self.visibilityIdentifiers[i]:
-                return self.getImageAt(i)
+        for i in range(len(self.layers), 0, -1):
+            if self.visibilityIdentifiers[i-1]:
+                return self.getImageAt(i-1  )
 
     def getLayerVisibility(self):
         """
@@ -82,8 +74,9 @@ class GUIEditorModel:
             if len(self.layers) == 0:
                 self.height = len(image)
                 self.width = len(image[0])
-            self.layers.insert(self.currentLayer, copy.deepcopy(image))
-            self.visibilityIdentifiers.insert(self.currentLayer, True)
+            self.layers.insert(self.currentLayer + 1, copy.deepcopy(image))
+            self.visibilityIdentifiers.insert(self.currentLayer + 1, True)
+            self.currentLayer += 1
         else:
             raise ValueError("Images must have the same dimensions")
 
@@ -94,8 +87,7 @@ class GUIEditorModel:
         if self.currentLayer == -1:
             return
         else:
-            del self.layers[self.currentLayer]
-            del self.visibilityIdentifiers[self.currentLayer]
+            self.layers.remove(self.currentLayer)
             self.currentLayer -= 1
 
     def removeAllImages(self):
@@ -105,12 +97,6 @@ class GUIEditorModel:
         self.layers.clear()
         self.visibilityIdentifiers.clear()
         self.currentLayer = -1
-
-    def moveLayer(self, start, end):
-        """
-        Moves the image current at the given start index to the given end index
-        """
-        self.layers.insert(end, self.layers.pop(start))
 
     def selectLayer(self, index):
         """
@@ -203,15 +189,15 @@ class GUIEditorModel:
         """
         Applies a mosaic filter to this model's selected layer.
         """
-        img = np.array(self.layers[self.currentLayer])
+        img = self.layers[self.currentLayer]
         seeds = self.getSeeds(numSeeds)
-        clusters = self.getClusters(seeds)
+        clusters = self.getClusters(seeds, img)
         avgRGB = self.getAvgRGB(clusters, seeds, img)
 
         ansImg = np.array(self.getImageAt(self.currentLayer))
         for i in range(self.height):
             for j in range(self.width):
-                cluster = clusters[j, i]
+                cluster = clusters[j][i][0]
                 rgb = avgRGB[cluster]
                 ansImg[j, i] = (rgb[0], rgb[1], rgb[2])
         self.layers[self.currentLayer] = Image.fromarray(ansImg)
@@ -221,7 +207,7 @@ class GUIEditorModel:
         Parameters:
         ============ 
         clusters:
-            2-D numpy array of integers that represents the cluster number of the corresponding pixel
+            double array of integers that represents the cluster number of the corresponding pixel
         seeds:
             List of tuples that represent the posns of the pixel seeds in the image
         image:
@@ -231,26 +217,28 @@ class GUIEditorModel:
         ============ 
         Dictionary that maps each cluster to the to the average color of that cluster.
         """
+        width, height = image.size
         averages = {}
-        clusterColors = np.zeros((len(seeds), 3))
+        clusterColors = []
 
         for sdIndex in range(len(seeds)):
             totalPixels = 0
-            for i in range(self.height):
-                for j in range(self.width):
-                    if clusters[j, i] == sdIndex:
-                        r, g, b = image[j, i, 0], image[j, i, 1], image[j, i, 2]
-                        clusterColors[sdIndex, 0] += r
-                        clusterColors[sdIndex, 1] += g
-                        clusterColors[sdIndex, 2] += b
+            clusterColors.append([0, 0, 0])
+            for i in range(height):
+                for j in range(width):
+                    if clusters[i][j][0] == sdIndex:
+                        r, g, b = image.getpixel((j, i))
+                        clusterColors[sdIndex][0] += r
+                        clusterColors[sdIndex][1] += g
+                        clusterColors[sdIndex][2] += b
                         totalPixels += 1
-            avgR = clusterColors[sdIndex, 0] // totalPixels
-            avgG = clusterColors[sdIndex, 1] // totalPixels
-            avgB = clusterColors[sdIndex, 2] // totalPixels
+            avgR = clusterColors[sdIndex][0] // totalPixels
+            avgG = clusterColors[sdIndex][1] // totalPixels
+            avgB = clusterColors[sdIndex][2] // totalPixels
             averages[sdIndex] = (avgR, avgG, avgB)
         return averages
 
-    def getClusters(self, seeds):
+    def getClusters(self, seeds, image):
         """
         Parameters:
         ============ 
@@ -261,11 +249,13 @@ class GUIEditorModel:
         
         Returns:
         ============ 
-        Double array of integers that represents the seed that each corresponding pixel is closest to.
-        """
-        clusters = np.zeros((self.height, self.width))
-        for i in range(self.height):
-            for j in range(self.width):
+        Double array of integers that represents the seed that each corresponding pixel is closest to."""
+        width, height = image.size
+        clusters = []
+        for i in range(height):
+            clusters.append([])
+            for j in range(width):
+                clusters[i].append([])
                 currPosn = (j, i)
                 cluster = 0
                 minDist = getDistance(currPosn, seeds[0])
@@ -275,7 +265,7 @@ class GUIEditorModel:
                     if tempDist < minDist:
                         minDist = tempDist
                         cluster = k
-                clusters[j, i] = cluster
+                clusters[i][j].append(cluster)
         return clusters
 
     def getSeeds(self, numSeeds):

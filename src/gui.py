@@ -1,20 +1,20 @@
-from calendar import c
 import sys
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from colorcircle import ColorCircle
-import model as model
-import seamCarver as sc
-import qdarkstyle
 import os
+from PIL.ImageQt import ImageQt
+import itertools
+import time
+import threading
 
 class Window(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self.setWindowTitle("PyEditor")
-        self.setWindowIcon(QIcon('icons/pythonLogo.png'))
+        self.setWindowIcon(QIcon('icons/logo.png'))
         self.setGeometry(100, 100, 1000, 700)
 
         self.centralWidget = QWidget()
@@ -22,6 +22,7 @@ class Window(QMainWindow):
 
         self.gridLayout = QGridLayout(self.centralWidget)
         self.gridLayout.setColumnStretch(0, 1)
+        self.gridLayout.setColumnMinimumWidth(1, 300)
 
         self.createMenuBar()
         self.createImagePanel()
@@ -35,27 +36,56 @@ class Window(QMainWindow):
         fileMenu = QMenu("&File", self)
         menuBar.addMenu(fileMenu)
 
-        actions = ["New", "Open", "Save", "Save As", "Save Project", "Quit"]
-
-        for action in actions:
-            fileMenu.addAction(action)
-        # fileMenu.addAction("&New")
-        # fileMenu.addAction("&Open")
-        # fileMenu.addAction("&Save")
-        # fileMenu.addAction("&Save As")
-        # fileMenu.addAction("&Save Project")
-        # fileMenu.addAction("&Quit")
+        self.newAct = QAction('&New')
+        fileMenu.addAction(self.newAct)
+        self.openAct = QAction('&Open')
+        fileMenu.addAction(self.openAct)
+        self.saveAct = QAction('&Save')
+        fileMenu.addAction(self.saveAct)
+        self.saveAsAct = QAction('&Save As')
+        fileMenu.addAction(self.saveAsAct)
+        self.saveProjAct = QAction('&Save Project')
+        fileMenu.addAction(self.saveProjAct)
+        self.quitAct = QAction('&Quit')
+        self.quitAct.triggered.connect(lambda: QApplication.quit())
+        fileMenu.addAction(self.quitAct)
 
         editMenu = QMenu("&Edit", self)
         menuBar.addMenu(editMenu)
-        editMenu.addAction("&Resize")
+        self.zinAct = QAction('&Zoom In')
+        editMenu.addAction(self.zinAct)
+        self.zoutAct = QAction('&Zoom Out')
+        editMenu.addAction(self.zoutAct)
 
         imageMenu = QMenu("&Image", self)
         menuBar.addMenu(imageMenu)
-        imageMenu.addAction("&Filter")
-        imageMenu.addAction("&Copy Layer")
-        imageMenu.addAction("&Remove")
-        imageMenu.addAction("&Remove All")
+        # creates filter submenu
+        filtermenu = imageMenu.addMenu('Filter')
+        self.blurAct = QAction('Blur')
+        filtermenu.addAction(self.blurAct)
+        self.sharpenAct = QAction('Sharpen')
+        filtermenu.addAction(self.sharpenAct)
+        self.sepiaAct = QAction('Sepia')
+        filtermenu.addAction(self.sepiaAct)
+        self.grayscaleAct = QAction('Grayscale')
+        filtermenu.addAction(self.grayscaleAct)
+        self.mosaicAct = QAction('Mosaic')
+        filtermenu.addAction(self.mosaicAct)
+
+        self.cLayerAct = QAction('&Copy Layer')
+        imageMenu.addAction(self.cLayerAct)
+        self.removeAct = QAction('&Remove Layer')
+        imageMenu.addAction(self.removeAct)
+        self.remAllAct = QAction('&Remove All')
+        imageMenu.addAction(self.remAllAct)
+
+        rotateMenu = imageMenu.addMenu('&Image Rotation')
+        self.rotateAct = QAction('&Rotate 90° Counterclockwise')
+        rotateMenu.addAction(self.rotateAct)
+        self.horizFlipAct = QAction('&Flip Horizontally')
+        rotateMenu.addAction(self.horizFlipAct)
+        self.vertFlipAct = QAction('&Flip Vertically')
+        rotateMenu.addAction(self.vertFlipAct)
 
         drawMenu = QMenu("&Draw", self)
         menuBar.addMenu(drawMenu)
@@ -69,16 +99,42 @@ class Window(QMainWindow):
 
         helpMenu = QMenu("&Help", self)
         menuBar.addMenu(helpMenu)
+
         helpMenu.addAction("&Help")
         helpMenu.addAction("&How to Use")
 
     def createImagePanel(self):
-        imageLabel = QLabel(self, alignment=Qt.AlignCenter)
-        pixmap = QPixmap('amongus.png')
-        imageLabel.setPixmap(pixmap)
-        self.gridLayout.addWidget(imageLabel, 0, 0, 3, 1)
+        """creates main image panel"""
+        self.imageLabel = QLabel(self, alignment=Qt.AlignCenter)
+        self.gridLayout.addWidget(self.imageLabel, 0, 0, 3, 1)
+        self.loadingLabel = QLabel()
+        self.loadingLabel.setAlignment(Qt.AlignCenter)
+        self.loadingLabel.setStyleSheet("background-color: rgba(0, 0, 0, 150); font-size: 16pt;")
+        self.gridLayout.addWidget(self.loadingLabel, 0, 0, 3, 1)
+        self.loadingLabel.hide()
+    
+    def loadScreen(self):
+        """starts the loading animation for certain processes that take a long time to run"""
+        self.finishedLoading = False
+        # use this when running long filters so user knows the image is being updated
+        def animate():
+            for c in itertools.cycle(['', '.', '..', '...']):
+                if self.finishedLoading:
+                    break
+                self.loadingLabel.setText('Applying ' + c)
+                time.sleep(0.3)
+        self.loadingThread = threading.Thread(target=animate, daemon=True)
+        self.loadingLabel.show()
+        self.loadingThread.start()
+
+    def removeLoadScreen(self):
+        """removes the loading animation from the image panel"""
+        self.finishedLoading = True
+        self.loadingLabel.clear()
+        self.loadingLabel.hide()
 
     def createDrawPanel(self):
+        """creates the panel that contains the filter tab and draw tab"""
         drawPanel = QWidget(self)
         drawLayout = QVBoxLayout(drawPanel)
         drawPanel.setLayout(drawLayout)
@@ -90,31 +146,48 @@ class Window(QMainWindow):
 
         scrollArea = QScrollArea(filterTab)
         scrollArea.setWidgetResizable(True)
-        scrollContent = QWidget(scrollArea)
+        scrollContent = QWidget()
         scrollLayout = QVBoxLayout(scrollContent)
+        scrollArea.setWidget(scrollContent)
 
-        filters = ['Blur', 'Sharpen', 'Sepia', 'Grayscale', 'Mosaic']
-        for filter in filters:
-            scrollItem = QPushButton(filter)
-            scrollLayout.addWidget(scrollItem)
+        self.blurBtn = QPushButton('Blur')
+        self.blurBtn.setFixedSize(QSize(75, 25))
+        scrollLayout.addWidget(self.blurBtn)
+        self.sharpenBtn = QPushButton('Sharpen')
+        self.sharpenBtn.setFixedSize(QSize(75, 25))
+        scrollLayout.addWidget(self.sharpenBtn)
+        self.sepiaBtn = QPushButton('Sepia')
+        self.sepiaBtn.setFixedSize(QSize(75, 25))
+        scrollLayout.addWidget(self.sepiaBtn)
+        self.grayBtn = QPushButton('Grayscale')
+        self.grayBtn.setFixedSize(QSize(75, 25))
+        scrollLayout.addWidget(self.grayBtn)
+        self.mosaicBtn = QPushButton('Mosaic')
+        self.mosaicBtn.setFixedSize(QSize(75, 25))
+        scrollLayout.addWidget(self.mosaicBtn)
+        self.carveBtn = QPushButton('Carve')
+        self.carveBtn.setFixedSize(QSize(75, 25))
+        scrollLayout.addWidget(self.carveBtn)
+
         filterLayout.addWidget(scrollArea)
 
-        apply = QPushButton("Apply", filterTab)
-        apply.setFixedSize(75, 25)
-        filterLayout.addWidget(apply)
-
         drawTab = QWidget()
-        drawTabLayout = QVBoxLayout(drawTab)
+        drawTabLayout = QGridLayout(drawTab)
         colorLabel = QLabel('Select Color or Enter RGB')
         colorLabel.setMaximumHeight(50)
-        colorInput = QLineEdit()
-        colorInput.setPlaceholderText('Enter RGB')
-        colorCircle = ColorCircle(self)
-        colorCircle.setMinimumSize(200, 200)
+        self.colorInput = QLineEdit()
+        self.colorInput.setPlaceholderText('Enter RGB')
+        self.enterColorBtn = QPushButton('Apply')
+        self.colorCircle = ColorCircle(self)
+        self.colorCircle.setMinimumSize(200, 200)
+        self.selectedColor = (0, 0, 0)
+        self.selectedColorLabel = QLabel()
+        self.selectedColorLabel.setStyleSheet(f'background-color: rgb{self.selectedColor};')
 
-        drawTabLayout.addWidget(colorLabel)
-        drawTabLayout.addWidget(colorCircle)
-        drawTabLayout.addWidget(colorInput)
+        drawTabLayout.addWidget(colorLabel, 0, 0, 1, 2)
+        drawTabLayout.addWidget(self.colorCircle, 1, 0, 2, 2)
+        drawTabLayout.addWidget(self.colorInput, 3, 0)
+        drawTabLayout.addWidget(self.enterColorBtn, 3, 1)
 
         tabs.addTab(filterTab, "Filter")
         tabs.addTab(drawTab, "Draw")
@@ -123,6 +196,7 @@ class Window(QMainWindow):
         self.gridLayout.addWidget(drawPanel, 0, 1)
 
     def createLayerPanel(self):
+        """creates layer panel on the bottom right of the GUI"""
         layerPanel = QWidget(self)
         layerLayout = QVBoxLayout(layerPanel)
 
@@ -130,20 +204,28 @@ class Window(QMainWindow):
         layerTab = QWidget(tab)
         layerTabLayout = QGridLayout(layerTab)
 
-        layerList = QListWidget(layerTab)
-        layerList.move(10, 20)
-        layerTabLayout.addWidget(layerList, 0, 0, 1, 2)
-        layerList.addItem('testLayer 1')
+        scrollArea = QScrollArea(layerTab)
+        scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scrollArea.setWidgetResizable(True)
 
-        addBtn = QPushButton('Add Layer')
-        addBtn.setFixedSize(75, 25)
-        deleteBtn = QPushButton('Delete')
-        #deleteBtn.setIcon(QIcon('icons/delete.png'))
-        deleteBtn.setFixedSize(75, 25)
+        self.layerList = LayerList()
+        scrollArea.setWidget(self.layerList)
+        self.layerList.setMinimumWidth(255)
+        scrollArea.setMinimumWidth(265)
+        
+        self.layerList.move(10, 20)
+        layerTabLayout.addWidget(scrollArea, 0, 0, 1, 2)
+
+        self.addLayerBtn = QPushButton('Add Layer')
+        self.copyLayerBtn = QPushButton('Copy')
+        self.delLayerBtn = QPushButton('Delete')
+        self.visibilityBtn = QPushButton('Toggle Visibilibility')
 
         tab.addTab(layerTab, "Layers")
-        layerTabLayout.addWidget(addBtn, 1, 0)
-        layerTabLayout.addWidget(deleteBtn, 1, 1)
+        layerTabLayout.addWidget(self.addLayerBtn, 1, 0)
+        layerTabLayout.addWidget(self.copyLayerBtn, 1, 1)
+        layerTabLayout.addWidget(self.delLayerBtn, 2, 0)
+        layerTabLayout.addWidget(self.visibilityBtn, 2, 1)
         layerLayout.addWidget(tab)
 
         self.gridLayout.addWidget(layerPanel, 1, 1)
@@ -151,11 +233,11 @@ class Window(QMainWindow):
     def createToolbar(self):
         """creates the left-hand tool bar (similar to PS) which will include brush, hand, lasso, and other tools"""
         editTools = QToolBar('Tools')
+        editTools.setMovable(False)
         # spacer widget for left
         top_spacer = QWidget()
         top_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         # spacer widget for right
-        # you can't add the same widget to both left and right. you need two different widgets.
         bottom_spacer = QWidget()
         bottom_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -172,26 +254,127 @@ class Window(QMainWindow):
         editTools.addActions([brushAct, lassoAct, textAct])
         editTools.addWidget(bottom_spacer)
         self.addToolBar(Qt.LeftToolBarArea, editTools)
-        return
 
-    def createLayerWidget(self, index):
-        layer = QWidget()
-        layout = QHBoxLayout(layer)
-        layer.setLayout(layout)
+    # takes in a PIL image, transforms it into a QPixMap, and updates the image
+    def updateImage(self, image):
+        """
+        Parameters
+        ============ 
+        image:
+            PIL Image in any format
 
-        eye = QPushButton()
-        eye.setIcon(QIcon('icons/eye.png'))
-        layout.addWidget(eye)
+        Converts the given PIL image into a QPixmap, then displays is on the main image panel"""
+        self.imageLabel.clear()
+        if image is not None:
+            im = image.convert("RGBA")
+            data = im.tobytes("raw","RGBA")
+            qim = QImage(data, im.size[0], im.size[1], QImage.Format_RGBA8888)
+            pix = QPixmap(qim)
+            self.imageLabel.setPixmap(pix)
 
-        layerLabel = QLabel(f'Layer {index}')
-        layout.addWidget(layerLabel)
-        return layer
+    def addLayer(self, index, layer):
+        """
+        Parameters
+        ============
+        index:
+            integer the index of the current selected layer
+        layer:
+            integer representing the number of layers created so far
+        
+        Adds a new layer to the project at the given index to the layer panel
+        """
+        widget = LayerWidget(f'Layer {layer}')
+        item = QListWidgetItem()
+        self.layerList.insertItem(index, item)
+        self.layerList.setItemWidget(item, widget)
+        item.setSizeHint(widget.sizeHint())
+    
+    def removeLayer(self, index):
+        """
+        removes the layer widget at the given index from the layer panel
+        """
+        self.layerList.takeItem(index)
 
-if __name__ == '__main__':
-    os.environ['QT_API'] = 'pyqt5'
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
-    app.setStyleSheet(qdarkstyle.load_stylesheet())
-    window = Window()
-    window.show()
-    sys.exit(app.exec_())
+    def removeAllLayers(self):
+        """
+        Removes all layers in the project
+        """
+        for _ in range(self.layerList.count()):
+            self.layerList.takeItem(0)
+
+    def connect_features(self, features):
+        """
+        Connects the buttons in this view to the given features (in this case will be the controller)
+        """
+        self.rotateAct.triggered.connect(features.rotateImages)
+        self.horizFlipAct.triggered.connect(features.horizontalFlip)
+        self.vertFlipAct.triggered.connect(features.verticalFlip)
+
+        self.blurBtn.clicked.connect(features.blur)
+        self.sharpenBtn.clicked.connect(features.sharpen)
+        self.sepiaBtn.clicked.connect(features.sepia)
+        self.grayBtn.clicked.connect(features.grayscale)
+        self.mosaicBtn.clicked.connect(features.mosaic)
+        self.carveBtn.clicked.connect(features.carveSeam)
+
+        self.blurAct.triggered.connect(features.blur)
+        self.sharpenAct.triggered.connect(features.sharpen)
+        self.sepiaAct.triggered.connect(features.sepia)
+        self.grayscaleAct.triggered.connect(features.grayscale)
+        self.mosaicAct.triggered.connect(features.mosaic)
+
+        self.addLayerBtn.clicked.connect(features.addLayer)
+        self.copyLayerBtn.clicked.connect(features.copyLayer)
+        self.delLayerBtn.clicked.connect(features.deleteLayer)
+        self.visibilityBtn.clicked.connect(features.changeVisibility)
+        self.layerList.currentRowChanged.connect(features.selectLayer)
+        self.layerList.itemMoved.connect(features.rearrangeLayers)
+
+class LayerWidget(QWidget):
+    """
+    Helper class that creates a layer widget, which will be added to the LayerList widget
+    Each Layer contains a name, as well as buttons for toggling its visibility and deleting the layer
+    """
+    def __init__(self, name, parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout()
+        self.setLayout(layout)
+
+        # self.visibility = QCheckBox()
+        # self.visibility.setChecked(True)
+        self.namelabel = QLineEdit(name)
+        self.namelabel.setFrame(False)
+        spacer = QSpacerItem(80, 25, QSizePolicy.Minimum, QSizePolicy.Expanding) 
+
+        #layout.addWidget(self.visibility)
+        layout.addWidget(self.namelabel)
+        layout.addItem(spacer)
+
+    def getName(self):
+        return self.namelabel.text()
+
+class LayerList(QListWidget):
+    """
+    Helper class that inheriting from QListWidget that reimplements some action event connections to 
+    better handle layer movement and manipulation.
+    """
+    itemMoved = pyqtSignal(int, int, QListWidgetItem) # Old index, new  index, item
+
+    def __init__(self, parent=None, **args):
+         super(LayerList, self).__init__(parent, **args)
+
+         self.setAcceptDrops(True)
+         self.setDragEnabled(True)
+         self.setDragDropMode(QAbstractItemView.InternalMove)
+         self.drag_item = None
+         self.drag_row = None
+
+    def dropEvent(self, event):
+         super(LayerList, self).dropEvent(event)
+         self.itemMoved.emit(self.drag_row, self.row(self.drag_item), self.drag_item)
+         self.drag_item = None
+
+    def startDrag(self, supportedActions):
+         self.drag_item = self.currentItem()
+         self.drag_row = self.row(self.drag_item)
+         super(LayerList, self).startDrag(supportedActions)

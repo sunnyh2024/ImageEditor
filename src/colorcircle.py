@@ -1,8 +1,13 @@
-from PyQt5.QtWidgets import QWidget, QSlider, QHBoxLayout, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QSizePolicy
 from PyQt5.QtCore import Qt, QRect, QPointF, QLineF, pyqtSignal
 from PyQt5.QtGui import QColor, QPainter, QPaintEvent, QResizeEvent, QConicalGradient, QRadialGradient, QMouseEvent
 
 class ColorCircle(QWidget):
+    """
+    Creates basic color circle to allow users to select brush color
+    Code taken from: https://gist.github.com/tobi08151405/7b0a8151c9df1a41a87c1559dac1243a
+    """
+
     currentColorChanged = pyqtSignal(QColor)
 
     def __init__(self, parent=None, startupcolor: list = [255, 255, 255], margin=10) -> None:
