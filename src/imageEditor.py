@@ -20,7 +20,6 @@ if __name__ == '__main__':
     window = Window()
     model = GUIEditorModel(im)
     controller = Controller(window, model)
-    controller.updateImage()
 
     # run GUI
     window.show()
