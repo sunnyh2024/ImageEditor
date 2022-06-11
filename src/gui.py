@@ -1,10 +1,8 @@
-import sys
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from colorcircle import ColorCircle
-import os
-from PIL.ImageQt import ImageQt
+from canvas import Canvas
 import itertools
 import time
 import threading
@@ -15,18 +13,17 @@ class Window(QMainWindow):
 
         self.setWindowTitle("PyEditor")
         self.setWindowIcon(QIcon('icons/logo.png'))
-        self.setGeometry(100, 100, 1000, 700)
+        self.setGeometry(100, 100, 1600, 1000)
 
         self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
 
         self.gridLayout = QGridLayout(self.centralWidget)
-        self.gridLayout.setColumnStretch(0, 1)
         self.gridLayout.setColumnMinimumWidth(1, 300)
 
         self.createMenuBar()
-        self.createImagePanel()
         self.createDrawPanel()
+        #self.createImagePanel()
         self.createLayerPanel()
         self.createToolbar()
 
@@ -103,14 +100,21 @@ class Window(QMainWindow):
         helpMenu.addAction("&Help")
         helpMenu.addAction("&How to Use")
 
-    def createImagePanel(self):
+    def createImagePanel(self, w, h):
         """creates main image panel"""
-        self.imageLabel = QLabel(self, alignment=Qt.AlignCenter)
-        self.gridLayout.addWidget(self.imageLabel, 0, 0, 3, 1)
+        leftSpacer = QLabel()
+        leftSpacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.gridLayout.addWidget(leftSpacer, 0, 0, 3, 1)
+        self.canvas = Canvas(w, h)
+        self.canvas.setAlignment(Qt.AlignCenter)
+        self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1)
+        rightSpacer = QLabel()
+        rightSpacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.gridLayout.addWidget(rightSpacer, 0, 2, 3, 1)
         self.loadingLabel = QLabel()
         self.loadingLabel.setAlignment(Qt.AlignCenter)
         self.loadingLabel.setStyleSheet("background-color: rgba(0, 0, 0, 150); font-size: 16pt;")
-        self.gridLayout.addWidget(self.loadingLabel, 0, 0, 3, 1)
+        self.gridLayout.addWidget(self.loadingLabel, 0, 0, 3, 3)
         self.loadingLabel.hide()
     
     def loadScreen(self):
@@ -180,20 +184,44 @@ class Window(QMainWindow):
         self.enterColorBtn = QPushButton('Apply')
         self.colorCircle = ColorCircle(self)
         self.colorCircle.setMinimumSize(200, 200)
-        self.selectedColor = (0, 0, 0)
-        self.selectedColorLabel = QLabel()
-        self.selectedColorLabel.setStyleSheet(f'background-color: rgb{self.selectedColor};')
+        selectedColor = QPixmap(30, 30)
+        selectedColor.fill()
+        self.selectedColorLabel = QLabel(alignment=Qt.AlignCenter)
+        self.selectedColorLabel.setStyleSheet('background-color: rgba(0, 0, 0, 0)')
+        self.selectedColorLabel.setPixmap(selectedColor)
+
+        self.widthSlider = QSlider(Qt.Horizontal)
+        self.widthSlider.setMinimum(1)
+        self.widthSlider.setMaximum(20)
+        self.widthSlider.setValue(5)
+        self.widthSlider.setTickPosition(QSlider.NoTicks)
+
+        self.brightnessSlider = QSlider(Qt.Horizontal)
+        self.brightnessSlider.setMinimum(0)
+        self.brightnessSlider.setMaximum(255)
+        self.brightnessSlider.setValue(255)
+        self.brightnessSlider.setTickPosition(QSlider.NoTicks)
 
         drawTabLayout.addWidget(colorLabel, 0, 0, 1, 2)
         drawTabLayout.addWidget(self.colorCircle, 1, 0, 2, 2)
+        drawTabLayout.addWidget(self.selectedColorLabel, 2, 1)
         drawTabLayout.addWidget(self.colorInput, 3, 0)
         drawTabLayout.addWidget(self.enterColorBtn, 3, 1)
+        drawTabLayout.addWidget(QLabel('Brush Size:'), 4, 0)
+        drawTabLayout.addWidget(self.widthSlider, 5, 0, 1, 2)
+        drawTabLayout.addWidget(QLabel('Color Brightness:'), 6, 0)
+        drawTabLayout.addWidget(self.brightnessSlider, 7, 0, 1, 2)
 
         tabs.addTab(filterTab, "Filter")
         tabs.addTab(drawTab, "Draw")
         drawLayout.addWidget(tabs)
 
-        self.gridLayout.addWidget(drawPanel, 0, 1)
+        self.gridLayout.addWidget(drawPanel, 0, 3)
+
+    def changeSelectedColor(self, newColor):
+        newLabel = QPixmap(30, 30)
+        newLabel.fill(newColor)
+        self.selectedColorLabel.setPixmap(newLabel)
 
     def createLayerPanel(self):
         """creates layer panel on the bottom right of the GUI"""
@@ -228,7 +256,7 @@ class Window(QMainWindow):
         layerTabLayout.addWidget(self.visibilityBtn, 2, 1)
         layerLayout.addWidget(tab)
 
-        self.gridLayout.addWidget(layerPanel, 1, 1)
+        self.gridLayout.addWidget(layerPanel, 1, 3)
 
     def createToolbar(self):
         """creates the left-hand tool bar (similar to PS) which will include brush, hand, lasso, and other tools"""
@@ -264,13 +292,13 @@ class Window(QMainWindow):
             PIL Image in any format
 
         Converts the given PIL image into a QPixmap, then displays is on the main image panel"""
-        self.imageLabel.clear()
+        self.canvas.clear()
         if image is not None:
             im = image.convert("RGBA")
             data = im.tobytes("raw","RGBA")
             qim = QImage(data, im.size[0], im.size[1], QImage.Format_RGBA8888)
             pix = QPixmap(qim)
-            self.imageLabel.setPixmap(pix)
+            self.canvas.setPixmap(pix)
 
     def addLayer(self, index, layer):
         """
@@ -330,6 +358,11 @@ class Window(QMainWindow):
         self.layerList.currentRowChanged.connect(features.selectLayer)
         self.layerList.itemMoved.connect(features.rearrangeLayers)
 
+        self.colorCircle.currentColorChanged.connect(features.updateColor)
+        self.canvas.canvasEdited.connect(features.updateBrushStroke)
+        self.widthSlider.valueChanged.connect(features.updateBrushSize)
+        self.brightnessSlider.valueChanged.connect(features.updateBrushBrightness)
+
 class LayerWidget(QWidget):
     """
     Helper class that creates a layer widget, which will be added to the LayerList widget
@@ -357,6 +390,7 @@ class LayerList(QListWidget):
     """
     Helper class that inheriting from QListWidget that reimplements some action event connections to 
     better handle layer movement and manipulation.
+    taken from : https://www.riverbankcomputing.com/pipermail/pyqt/2011-June/030002.html 
     """
     itemMoved = pyqtSignal(int, int, QListWidgetItem) # Old index, new  index, item
 

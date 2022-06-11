@@ -8,6 +8,7 @@ import qdarkstyle
 import sys
 from PIL import Image
 import utils
+import io
 
 
 class Controller():
@@ -19,10 +20,13 @@ class Controller():
         self.layerCount = 0
         self.view = view
         self.model = model
-        self.view.connect_features(self)
+        w, h = self.model.getSize()
+        self.view.createImagePanel(w, h)
         for _ in model.getAllImages():
             self.view.addLayer(0, self.layerCount)
             self.layerCount += 1
+        self.updateImage()
+        self.view.connect_features(self)
 
         # create settings to store data between sessions (optional add)
         self.settings = QSettings('session_data.ini', QSettings.IniFormat)
@@ -155,8 +159,8 @@ class Controller():
         """
         selected = self.selectLayer()
         w, h = self.model.getSize()
-        im = Image.new(mode="RGB", size=(w, h),
-                       color=(255, 255, 255))
+        im = Image.new(mode="RGBA", size=(w, h),
+                       color=(255, 255, 255, 0))
         self.model.addImage(im)
         self.view.addLayer(selected, self.layerCount)
         self.updateImage()
@@ -184,7 +188,8 @@ class Controller():
         """
         Updates the GUI's displayed image according to the topmost visible image in the model
         """
-        img = self.model.getTopMost()
+        #img = self.model.getTopMost()
+        img = self.model.getDisplayImage()
         self.view.updateImage(img)
 
     def rearrangeLayers(self, i, j):
@@ -218,6 +223,42 @@ class Controller():
         return
 
     # SAVE FUNCTIONS HERE
+
+    def updateColor(self):
+        color = self.view.colorCircle.getColor()
+        brightness = self.view.brightnessSlider.value()/255
+        r = int(color.red()*brightness)
+        g = int(color.green()*brightness)
+        b = int(color.blue()*brightness)
+        newColor = QColor(r, g, b)
+        self.view.canvas.setBrushColor(newColor)
+        self.view.changeSelectedColor(newColor)
+
+    def updateBrushSize(self):
+        size = self.view.widthSlider.value()
+        self.view.canvas.setBrushSize(size)
+
+    def updateBrushBrightness(self):
+        brightness = self.view.brightnessSlider.value()/255
+        color = self.view.colorCircle.getColor()
+        r = int(color.red()*brightness)
+        g = int(color.green()*brightness)
+        b = int(color.blue()*brightness)
+        newColor = QColor(r, g, b)
+        self.view.canvas.setBrushColor(newColor)
+        self.view.changeSelectedColor(newColor)
+
+    def updateBrushStroke(self):
+        top, i = self.model.getTopMost()
+        canvas = self.view.canvas.pixmap()
+        canvas = canvas.toImage()
+        buffer = QBuffer()
+        buffer.open(QBuffer.ReadWrite)
+        canvas.save(buffer, "PNG")
+        pil_im = Image.open(io.BytesIO(buffer.data()))
+        top.paste(pil_im, (0, 0), pil_im.convert('RGBA'))
+        self.model.layers[i] = top
+
 
     #TODO:
     # CHANGE THE WAY WE SHOW THE IMAGE TO ACCOUNT FOR TRANSPARENT PIXELS
