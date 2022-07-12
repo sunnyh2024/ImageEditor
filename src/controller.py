@@ -1,3 +1,4 @@
+from turtle import bk
 from model import GUIEditorModel
 from gui import Window
 import os
@@ -21,7 +22,8 @@ class Controller():
         self.view = view
         self.model = model
         w, h = self.model.getSize()
-        self.view.createImagePanel(w, h)
+        bkgrnd = self.model.getDisplayImage()
+        self.view.createImagePanel(w, h, bkgrnd)
         for _ in model.getAllImages():
             self.view.addLayer(0, self.layerCount)
             self.layerCount += 1
@@ -159,8 +161,7 @@ class Controller():
         """
         selected = self.selectLayer()
         w, h = self.model.getSize()
-        im = Image.new(mode="RGBA", size=(w, h),
-                       color=(255, 255, 255, 0))
+        im = Image.new(mode="RGBA", size=(w, h), color=(255, 255, 255, 100))
         self.model.addImage(im)
         self.view.addLayer(selected, self.layerCount)
         self.updateImage()
@@ -219,34 +220,30 @@ class Controller():
         return
 
     def openProject(self):
-
+        """
+        Opens a project in the editor's specific format
+        """
         return
 
     # SAVE FUNCTIONS HERE
 
-    def updateColor(self):
+    def updateBrush(self):
+        """
+        UPdates the hue and opacity of the brush and changes the preview square to match the new color
+        """
         color = self.view.colorCircle.getColor()
         brightness = self.view.brightnessSlider.value()/255
         r = int(color.red()*brightness)
         g = int(color.green()*brightness)
         b = int(color.blue()*brightness)
-        newColor = QColor(r, g, b)
+        a = self.view.opacitySlider.value()
+        newColor = QColor(r, g, b, a)
         self.view.canvas.setBrushColor(newColor)
         self.view.changeSelectedColor(newColor)
 
     def updateBrushSize(self):
         size = self.view.widthSlider.value()
         self.view.canvas.setBrushSize(size)
-
-    def updateBrushBrightness(self):
-        brightness = self.view.brightnessSlider.value()/255
-        color = self.view.colorCircle.getColor()
-        r = int(color.red()*brightness)
-        g = int(color.green()*brightness)
-        b = int(color.blue()*brightness)
-        newColor = QColor(r, g, b)
-        self.view.canvas.setBrushColor(newColor)
-        self.view.changeSelectedColor(newColor)
 
     def updateBrushStroke(self):
         top, i = self.model.getTopMost()
