@@ -1,3 +1,4 @@
+from operator import attrgetter
 import numpy as np
 from PIL import Image
 from matplotlib import cm
@@ -6,13 +7,9 @@ import random as rand
 
 class SeamInfo:
 
-    def __init__(self, weight, posn):
+    def __init__(self, weight, posns):
         self.weight = weight
-        self.pixels = [posn]
-
-    def add(self, weight, posn):
-        self.weight += weight
-        self.pixels.append(posn)
+        self.pixels = posns
 
 
 def getEnergyMap(image):
@@ -20,9 +17,9 @@ def getEnergyMap(image):
     The outer array in the map represents the y coordinates (rows)"""
     shape = image.shape
     map = []
-    for i in range(shape[1]):
+    for i in range(shape[0]):
         map.append([])
-        for j in range(shape[0]):
+        for j in range(shape[1]):
             tl, t, tr, l, r, dl, d, dr = getNeighbors(image, j, i)
             map[i].append(getEnergy(tl, t, tr, l, r, dl, d, dr))
     return np.array(map)
@@ -60,32 +57,61 @@ def getNeighbors(image, x, y):
 
 def getBrightness(rgb):
     """helper for getNeighbors that returns the brightness as the average of the given rgb values"""
-    return (rgb[0] + rgb[1] + rgb[2]) / 765
+    return (int(rgb[0]) + int(rgb[1]) + int(rgb[2])) / 765
 
 
 def findLowestSeam(image, dir):
-    # if dir is true, finds lowest horizontal seam, else finds lowest vertical seam
+    # if dir is true, finds lowest vertical seam, else finds lowest horizontal seam
     seams = []
     energyMap = getEnergyMap(image)
     shape = energyMap.shape
     if (dir):
-        for j in range(shape[0]):
-            seams.append(SeamInfo(energyMap[j][0], j))
-        for i in range(shape[1] - 1):
-            for j in range(shape[0]):
-                weight, posn = findLowestEnergyHoriz(energyMap, (j, i))
-                seams[j].add(weight, posn[1])
-    else:
         for i in range(shape[1]):
-            seams.append(SeamInfo(energyMap[0][i], i))
-        for j in range(shape[0] - 1):
+            seams.append(SeamInfo(energyMap[0][i], [i]))
+        for j in range(1, shape[0]):
+            newSeams = []
             for i in range(shape[1]):
-                weight, posn = findLowestEnergyVert(energyMap, (j, i))
-                seams[j].add(weight, posn[0])
-    weights = [seam.weight for seam in seams]
-    return seams[weights.index(min(weights))].pixels
+                newSeams.append(createNewVerticalSeam(seams, (i, j), energyMap[j][i]))
+            seams = newSeams
+    else:
+        for j in range(shape[0]):
+            seams.append(SeamInfo(energyMap[j][0], [j]))
+        for i in range(1, shape[1]):
+            newSeams = []
+            for j in range(shape[0]):
+                newSeams.append(createNewHorizontalSeam(seams, (i, j), energyMap[j][i]))
+            seams = newSeams
+    return min(seams, key=attrgetter('weight'))
 
+def createNewVerticalSeam(seams, posn, weight):
+    neighborSeams = [float('inf'), seams[posn[0]].weight, float('inf')]
+    if (posn[0] != 0):
+        neighborSeams[0] = seams[posn[0] - 1].weight
+    if (posn[0] != len(seams) - 1):
+        neighborSeams[2] = seams[posn[0] + 1].weight
+    minValue = min(neighborSeams)
+    minIndex = neighborSeams.index(minValue)
+    prevSeam = seams[posn[0] - 1 + minIndex]
+    newPixelList = [] 
+    newPixelList.extend(prevSeam.pixels)
+    newPixelList.append(posn[0])
+    return SeamInfo(prevSeam.weight + weight, newPixelList)
 
+def createNewHorizontalSeam(seams, posn, weight):
+    neighborSeams = [float('inf'), seams[posn[1]].weight, float('inf')]
+    if (posn[1] != 0):
+        neighborSeams[0] = seams[posn[1] - 1].weight
+    if (posn[1] < len(seams) - 1):
+        neighborSeams[2] = seams[posn[1] + 1].weight
+    minValue = min(neighborSeams)
+    minIndex = neighborSeams.index(minValue)
+    prevSeam = seams[posn[1] - 1 + minIndex]
+    newPixelList = [] 
+    newPixelList.extend(prevSeam.pixels)
+    newPixelList.append(posn[1])
+    return SeamInfo(prevSeam.weight + weight, newPixelList)
+
+    
 def findLowestEnergyHoriz(energyMap, posn):
     i = posn[0]
     j = posn[1]
@@ -114,44 +140,51 @@ def findLowestEnergyVert(energyMap, posn):
     return key, nextEnergies[key]
 
 
-def removeSeam(image, seam, axis=0):
-    image = np.asanyarray(image)
-    seam = np.asanyarray(seam)
-    axis = np.core.multiarray.normalize_axis_index(axis, image.ndim)
+def removeSeam(image, seam, axis=1):
+    shape = image.shape
+    mask = np.ones((shape[0], shape[1]), bool)
 
-    assert image.ndim == 3
-    assert image.shape[-1] == 3
-    assert axis in {0, 1}
-    assert seam.size == image.shape[axis]
-
-    shape = list(image.shape)
-    if (axis == 0):
-        seam = [list(range(len(seam))), seam]
+# 0 means horizontal
+    if (axis == 1):
+        for i in range (len(seam.pixels)):
+            mask[i, seam.pixels[i]] = False
+        newImage = image[mask].reshape(shape[0], shape[1] - 1, shape[2])
 
     else:
-        seam = [seam, list(range(len(seam)))]
+        for i in range (len(seam.pixels)):
+            mask[seam.pixels[i], i] = False
+        newImage = image[mask].reshape(shape[0] - 1, shape[1], shape[2])
 
-    seam = np.ravel_multi_index(seam, (image.shape[:-1]))
-    image = image.reshape(-1, 3)
-    shape[axis] -= 1
-    result = np.delete(image, seam, axis=0).reshape(shape)
-    return result
+    return newImage
 
 
 def carveSeam(image, targetWidth, targetHeight):
+    import time
+
     image = np.array(image)
     shape = list(image.shape)
-    while shape[0] > targetWidth and shape[1] > targetHeight:
+    start = time.time()
+    while shape[1] > targetWidth and shape[0] > targetHeight:
         r = rand.randint(0, 1)
         seam = findLowestSeam(image, r)
         image = removeSeam(image, seam, r)
         shape = list(image.shape)
-    while shape[0] > targetWidth:
+    while shape[1] > targetWidth:
+        c = time.time()
+        print(c - start)
+        start = c
+        seam = findLowestSeam(image, 1)
+        c = time.time()
+        print('find: ', c - start)
+        start = c
+        image = removeSeam(image, seam, 1)
+        c = time.time()
+        print('remove: ', c - start)
+        start = c
+        shape = list(image.shape)
+    while shape[0] > targetHeight:
         seam = findLowestSeam(image, 0)
         image = removeSeam(image, seam, 0)
         shape = list(image.shape)
-    while shape[1] > targetHeight:
-        seam = findLowestSeam(image, 1)
-        image = removeSeam(image, seam, 1)
-        shape = list(image.shape)
-    return Image.fromarray(image.astype(np.uint8))
+    return image
+    # return Image.fromarray(image.astype(np.uint8))
