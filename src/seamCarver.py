@@ -57,7 +57,7 @@ def getNeighbors(image, x, y):
 
 def getBrightness(rgb):
     """helper for getNeighbors that returns the brightness as the average of the given rgb values"""
-    return (rgb[0] + rgb[1] + rgb[2]) / 765
+    return (int(rgb[0]) + int(rgb[1]) + int(rgb[2])) / 765
 
 
 def findLowestSeam(image, dir):
@@ -159,16 +159,28 @@ def removeSeam(image, seam, axis=1):
 
 
 def carveSeam(image, targetWidth, targetHeight):
+    import time
+
     image = np.array(image)
     shape = list(image.shape)
+    start = time.time()
     while shape[1] > targetWidth and shape[0] > targetHeight:
         r = rand.randint(0, 1)
         seam = findLowestSeam(image, r)
         image = removeSeam(image, seam, r)
         shape = list(image.shape)
     while shape[1] > targetWidth:
+        c = time.time()
+        print(c - start)
+        start = c
         seam = findLowestSeam(image, 1)
+        c = time.time()
+        print('find: ', c - start)
+        start = c
         image = removeSeam(image, seam, 1)
+        c = time.time()
+        print('remove: ', c - start)
+        start = c
         shape = list(image.shape)
     while shape[0] > targetHeight:
         seam = findLowestSeam(image, 0)
