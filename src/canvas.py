@@ -11,17 +11,17 @@ class Canvas(QLabel):
     """
     canvasEdited = pyqtSignal()
 
-    def __init__(self, w, h, pixmap=None):
+    def __init__(self, w, h):
         super().__init__()
         self.setFixedSize(w, h)
-        if pixmap is None:
-            pixmap = QPixmap(w, h)
-            #pixmap.fill(Qt.transparent)
-            pixmap.fill()
+        self.setAttribute(Qt.WA_TranslucentBackground)
+
+        pixmap = QPixmap(w, h)
+        pixmap.fill(Qt.transparent)
         self.setPixmap(pixmap)
 
-        self.lastX, self.lastY = None, None
-        self.brushColor = QColor('#000000')
+        self.lastPos = None
+        self.brushColor = QColor('#FFFFFF')
         self.brushSize = 5
 
     def setBrushColor(self, c: QColor):
@@ -30,16 +30,24 @@ class Canvas(QLabel):
     def setBrushSize(self, s: int):
         self.brushSize = s
 
+    def mousePressEvent(self, e: QMouseEvent) -> None:
+        if e.button() == Qt.LeftButton:
+            self.lastPos = e.pos()
+            
+
     def mouseMoveEvent(self, e):
         """
         Override parent mouse event function to update x and y
         """
+        print('here')
         if self.lastX is None:
+            print(e.x(), e.y())
             self.lastX = e.x()
             self.lastY = e.y()
             return # Ignore first event
-
+        print('after')
         painter = QPainter(self.pixmap())
+        print('making painter')
         p = painter.pen()
         p.setWidth(self.brushSize)
         p.setColor(self.brushColor)
@@ -49,6 +57,7 @@ class Canvas(QLabel):
         self.update()
 
         #update lastx and lasty
+        print('not first', e.x(), e.y())
         self.lastX = e.x()
         self.lastY = e.y()
 
@@ -56,3 +65,4 @@ class Canvas(QLabel):
         self.lastX = None
         self.lastY = None
         self.canvasEdited.emit()
+

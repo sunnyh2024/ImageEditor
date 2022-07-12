@@ -15,6 +15,7 @@ if __name__ == '__main__':
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
     im = Image.open('amongus.png')
+    blank = Image.new(mode="RGBA", size=(512, 512), color=(255, 255, 255, 0))
 
     # initiate MCV and connect features
     window = Window()

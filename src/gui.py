@@ -3,6 +3,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from colorcircle import ColorCircle
 from canvas import Canvas
+import utils
 import itertools
 import time
 import threading
@@ -13,7 +14,7 @@ class Window(QMainWindow):
 
         self.setWindowTitle("PyEditor")
         self.setWindowIcon(QIcon('icons/logo.png'))
-        self.setGeometry(100, 100, 1600, 1000)
+        self.setGeometry(400, 200, 1600, 900)
 
         self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
@@ -100,14 +101,18 @@ class Window(QMainWindow):
         helpMenu.addAction("&Help")
         helpMenu.addAction("&How to Use")
 
-    def createImagePanel(self, w, h):
+    def createImagePanel(self, w, h, background):
         """creates main image panel"""
         leftSpacer = QLabel()
         leftSpacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.gridLayout.addWidget(leftSpacer, 0, 0, 3, 1)
+        # self.workspace = WorkSpace(w, h, background)
+        # self.gridLayout.addWidget(self.workspace, 0, 1, 3, 1, alignment=Qt.AlignCenter)
+        self.background = QLabel()
+        self.background.setPixmap(utils.toPixmap(background))
+        self.gridLayout.addWidget(self.background, 0, 1, 3, 1, alignment=Qt.AlignCenter)
         self.canvas = Canvas(w, h)
-        self.canvas.setAlignment(Qt.AlignCenter)
-        self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1)
+        self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1, alignment=Qt.AlignCenter)
         rightSpacer = QLabel()
         rightSpacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.gridLayout.addWidget(rightSpacer, 0, 2, 3, 1)
@@ -202,6 +207,18 @@ class Window(QMainWindow):
         self.brightnessSlider.setValue(255)
         self.brightnessSlider.setTickPosition(QSlider.NoTicks)
 
+        self.opacitySlider = QSlider(Qt.Horizontal)
+        self.opacitySlider.setMinimum(0)
+        self.opacitySlider.setMaximum(255)
+        self.opacitySlider.setValue(255)
+        self.opacitySlider.setTickPosition(QSlider.NoTicks)
+
+        self.hardnessSlider = QSlider(Qt.Horizontal)
+        self.hardnessSlider.setMinimum(0)
+        self.hardnessSlider.setMaximum(100)
+        self.hardnessSlider.setValue(75)
+        self.hardnessSlider.setTickPosition(QSlider.NoTicks)
+
         drawTabLayout.addWidget(colorLabel, 0, 0, 1, 2)
         drawTabLayout.addWidget(self.colorCircle, 1, 0, 2, 2)
         drawTabLayout.addWidget(self.selectedColorLabel, 2, 1)
@@ -211,6 +228,10 @@ class Window(QMainWindow):
         drawTabLayout.addWidget(self.widthSlider, 5, 0, 1, 2)
         drawTabLayout.addWidget(QLabel('Color Brightness:'), 6, 0)
         drawTabLayout.addWidget(self.brightnessSlider, 7, 0, 1, 2)
+        drawTabLayout.addWidget(QLabel('Opacity:'), 8, 0)
+        drawTabLayout.addWidget(self.opacitySlider, 9, 0, 1, 2)
+        drawTabLayout.addWidget(QLabel('Hardness:'),10, 0)
+        drawTabLayout.addWidget(self.hardnessSlider, 11, 0, 1, 2)
 
         tabs.addTab(filterTab, "Filter")
         tabs.addTab(drawTab, "Draw")
@@ -294,11 +315,8 @@ class Window(QMainWindow):
         Converts the given PIL image into a QPixmap, then displays is on the main image panel"""
         self.canvas.clear()
         if image is not None:
-            im = image.convert("RGBA")
-            data = im.tobytes("raw","RGBA")
-            qim = QImage(data, im.size[0], im.size[1], QImage.Format_RGBA8888)
-            pix = QPixmap(qim)
-            self.canvas.setPixmap(pix)
+            image = utils.toPixmap(image)
+        self.canvas.setPixmap(image)
 
     def addLayer(self, index, layer):
         """
@@ -358,10 +376,12 @@ class Window(QMainWindow):
         self.layerList.currentRowChanged.connect(features.selectLayer)
         self.layerList.itemMoved.connect(features.rearrangeLayers)
 
-        self.colorCircle.currentColorChanged.connect(features.updateColor)
+        self.colorCircle.currentColorChanged.connect(features.updateBrush)
         self.canvas.canvasEdited.connect(features.updateBrushStroke)
         self.widthSlider.valueChanged.connect(features.updateBrushSize)
-        self.brightnessSlider.valueChanged.connect(features.updateBrushBrightness)
+        self.brightnessSlider.valueChanged.connect(features.updateBrush)
+        self.opacitySlider.valueChanged.connect(features.updateBrush)
+        self.hardnessSlider.valueChanged.connect(features.updateBrush)
 
 class LayerWidget(QWidget):
     """
