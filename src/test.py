@@ -17,10 +17,7 @@ import random as rand
 img = np.array([[[255, 255, 0], [0, 255, 0], [0, 255, 255]], 
 [[0, 255, 0], [255, 0, 255], [255, 0, 0]], 
 [[0, 255, 255], [255, 255, 0], [0, 255, 0]]])
-neighbors = sc.getNeighbors(img, 1, 1)
-seam = sc.findLowestSeam(img, False)
-print(seam)
-img = sc.carveSeam(img, 3, 1)
+img = sc.carveSeam(img, 1, 3)
 print(img)
 
 # img = img.resize((300, 300))
