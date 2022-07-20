@@ -126,7 +126,6 @@ def findLowestEnergyHoriz(energyMap, posn):
 
 
 
-
 def findLowestEnergyVert(energyMap, posn):
     i = posn[0]
     j = posn[1]

@@ -3,30 +3,35 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from colorcircle import ColorCircle
 from canvas import Canvas
+from canvasnew import PaintScene, PaintView
 import utils
 import itertools
 import time
 import threading
 
 class Window(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, w, h, parent=None):
         super().__init__(parent)
 
         self.setWindowTitle("PyEditor")
         self.setWindowIcon(QIcon('icons/logo.png'))
-        self.setGeometry(400, 200, 1600, 900)
+        self.setGeometry(400, 200, w, h)
 
         self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
 
         self.gridLayout = QGridLayout(self.centralWidget)
         self.gridLayout.setColumnMinimumWidth(1, 300)
+        self.gridLayout.setColumnStretch(1, 1)
+        self.gridLayout.setColumnStretch(3, 0)
 
         self.createMenuBar()
         self.createDrawPanel()
         #self.createImagePanel()
         self.createLayerPanel()
         self.createToolbar()
+
+        self.t = None
 
     def createMenuBar(self):
         """Creates the top menu bar with the File, Image, Draw and Help Menus"""
@@ -103,19 +108,11 @@ class Window(QMainWindow):
 
     def createImagePanel(self, w, h, background):
         """creates main image panel"""
-        leftSpacer = QLabel()
-        leftSpacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.gridLayout.addWidget(leftSpacer, 0, 0, 3, 1)
-        # self.workspace = WorkSpace(w, h, background)
-        # self.gridLayout.addWidget(self.workspace, 0, 1, 3, 1, alignment=Qt.AlignCenter)
-        self.background = QLabel()
-        self.background.setPixmap(utils.toPixmap(background))
-        self.gridLayout.addWidget(self.background, 0, 1, 3, 1, alignment=Qt.AlignCenter)
-        self.canvas = Canvas(w, h)
-        self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1, alignment=Qt.AlignCenter)
-        rightSpacer = QLabel()
-        rightSpacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.gridLayout.addWidget(rightSpacer, 0, 2, 3, 1)
+        self.scene = PaintScene(utils.toPixmap(background), 0, 0, w, h, None)
+        self.canvas = PaintView(self.scene)
+        self.canvas.setRenderHint(QPainter.HighQualityAntialiasing)
+        self.canvas.mapToScene(0, 0, w, h)
+        self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1)
         self.loadingLabel = QLabel()
         self.loadingLabel.setAlignment(Qt.AlignCenter)
         self.loadingLabel.setStyleSheet("background-color: rgba(0, 0, 0, 150); font-size: 16pt;")
@@ -377,7 +374,7 @@ class Window(QMainWindow):
         self.layerList.itemMoved.connect(features.rearrangeLayers)
 
         self.colorCircle.currentColorChanged.connect(features.updateBrush)
-        self.canvas.canvasEdited.connect(features.updateBrushStroke)
+        #self.canvas.canvasEdited.connect(features.updateBrushStroke)
         self.widthSlider.valueChanged.connect(features.updateBrushSize)
         self.brightnessSlider.valueChanged.connect(features.updateBrush)
         self.opacitySlider.valueChanged.connect(features.updateBrush)

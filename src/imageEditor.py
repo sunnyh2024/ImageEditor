@@ -14,11 +14,14 @@ if __name__ == '__main__':
     app.setStyle('Fusion')
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    im = Image.open('amongus.png')
+    im = Image.open('tower.png')
     blank = Image.new(mode="RGBA", size=(512, 512), color=(255, 255, 255, 0))
 
+    screen_res = app.desktop().screenGeometry()
+    w, h = screen_res.width(), screen_res.height()
+
     # initiate MCV and connect features
-    window = Window()
+    window = Window(int(w*0.6), int(h*0.6))
     model = GUIEditorModel(im)
     controller = Controller(window, model)
 

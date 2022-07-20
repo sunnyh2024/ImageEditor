@@ -1,5 +1,7 @@
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
+from seamCarver import carveSeam
+from PIL import Image
 import itertools
 import sys
 import time
@@ -36,24 +38,15 @@ class SeamCarveWorker(QObject):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
 
-    def __init__(self, parent=None):
+    def __init__(self, model, width, height, parent=None):
         super().__init__(parent)
-        self.placeholder = 'test'
+        self.width = width
+        self.height = height
+        self.model = model
 
-# done = False
-# #here is the animation
-# def animate():
-#     for c in itertools.cycle(['|', '/', '-', '\\']):
-#         if done:
-#             break
-#         sys.stdout.write('\rloading ' + c)
-#         sys.stdout.flush()
-#         time.sleep(0.1)
-#     sys.stdout.write('\rDone!     ')
-
-# t = threading.Thread(target=animate)
-# t.start()
-
-# #long process here
-# time.sleep(10)
-# done = True
+    def run(self):
+        for count, image in enumerate(self.model.getAllImages()):
+            newImage = Image.fromarray(carveSeam(image, self.width, self.height))
+            self.model.layers[count] = newImage
+            self.progress.emit(count)
+        self.finished.emit()

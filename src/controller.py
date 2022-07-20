@@ -27,7 +27,7 @@ class Controller():
         for _ in model.getAllImages():
             self.view.addLayer(0, self.layerCount)
             self.layerCount += 1
-        self.updateImage()
+        #self.updateImage()
         self.view.connect_features(self)
 
         # create settings to store data between sessions (optional add)
@@ -77,6 +77,8 @@ class Controller():
             return
         numseeds = numseeds[0]
         # Setting up thread (mosaic takes too long and freezes GUI)
+        if self.view.t:
+            return 
         self.view.t = QThread()
         self.view.worker = utils.MosaicWorker(self.model, numseeds)
         # create worker and move to thread
@@ -85,7 +87,6 @@ class Controller():
         self.view.worker.finished.connect(self.view.t.quit)
         self.view.worker.finished.connect(self.view.worker.deleteLater)
         self.view.t.finished.connect(self.view.t.deleteLater)
-        self.view.t.finished.connect(lambda: print('Finished mosaic'))
         self.view.t.finished.connect(self.updateImage)
         self.view.t.finished.connect(self.view.removeLoadScreen)
         self.view.loadScreen() # let user know that process is running
@@ -107,7 +108,22 @@ class Controller():
             return
         w = width[0] if width[0] else maxWH[0]
         h = height[0] if height[0] else maxWH[1]
-        print('carving seams', w, h)
+        # Setting up thread (mosaic takes too long and freezes GUI)
+        if self.view.t:
+            return 
+        self.view.t = QThread()
+        self.view.worker = utils.SeamCarveWorker(self.model, w, h)
+        # create worker and move to thread
+        self.view.worker.moveToThread(self.view.t)
+        self.view.t.started.connect(self.view.worker.run)
+        self.view.worker.progress.connect(lambda i: print(f'carving for layer {i} completed'))
+        self.view.worker.finished.connect(self.view.t.quit)
+        self.view.worker.finished.connect(self.view.worker.deleteLater)
+        self.view.t.finished.connect(self.view.t.deleteLater)
+        self.view.t.finished.connect(self.updateImage)
+        self.view.t.finished.connect(self.view.removeLoadScreen)
+        self.view.loadScreen() # let user know that process is running
+        self.view.t.start()
 
     def rotateImages(self):
         """

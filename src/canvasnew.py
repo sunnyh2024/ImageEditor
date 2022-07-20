@@ -35,8 +35,8 @@ class PaintScene(QGraphicsScene):
         self.width = self.sceneRect().width()
         self.height = self.sceneRect().height()
 
-        backgroundItem = self.addPixmap(background)
-        backgroundItem.setZValue(0)
+        self.background = self.addPixmap(background)
+        self.background.setZValue(0)
 
         # stroke info
         self.next_stroke = 0
