@@ -2,8 +2,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from colorcircle import ColorCircle
-from canvas import Canvas
-from canvasnew import PaintScene, PaintView
+from canvas import PaintScene, PaintView
 import utils
 import itertools
 import time
@@ -27,7 +26,6 @@ class Window(QMainWindow):
 
         self.createMenuBar()
         self.createDrawPanel()
-        #self.createImagePanel()
         self.createLayerPanel()
         self.createToolbar()
 
@@ -271,10 +269,8 @@ class Window(QMainWindow):
         """creates the left-hand tool bar (similar to PS) which will include brush, hand, lasso, and other tools"""
         editTools = QToolBar('Tools')
         editTools.setMovable(False)
-        # spacer widget for left
         top_spacer = QWidget()
         top_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # spacer widget for right
         bottom_spacer = QWidget()
         bottom_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -369,7 +365,6 @@ class Window(QMainWindow):
         self.widthSlider.valueChanged.connect(features.updateBrushSize)
         self.brightnessSlider.valueChanged.connect(features.updateBrush)
         self.opacitySlider.valueChanged.connect(features.updateBrush)
-        #self.hardnessSlider.valueChanged.connect(features.updateBrushHardness)
 
 class LayerWidget(QWidget):
     """

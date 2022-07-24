@@ -1,7 +1,5 @@
 from operator import attrgetter
 import numpy as np
-from PIL import Image
-from matplotlib import cm
 import random as rand
 
 
@@ -61,7 +59,13 @@ def getBrightness(rgb):
 
 
 def findLowestSeam(image, dir):
-    # if dir is true, finds lowest vertical seam, else finds lowest horizontal seam
+    """
+    Parameters
+    ============
+    dir:
+        bool that specifies which direction the seam should be in
+        if dir is True, finds lowest vertical seam, else finds lowest horizontal seam
+    """
     seams = []
     energyMap = getEnergyMap(image)
     shape = energyMap.shape
@@ -84,6 +88,9 @@ def findLowestSeam(image, dir):
     return min(seams, key=attrgetter('weight'))
 
 def createNewVerticalSeam(seams, posn, weight):
+    """
+    
+    """
     neighborSeams = [float('inf'), seams[posn[0]].weight, float('inf')]
     if (posn[0] != 0):
         neighborSeams[0] = seams[posn[0] - 1].weight

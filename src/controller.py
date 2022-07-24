@@ -1,12 +1,8 @@
-from turtle import bk
 from model import GUIEditorModel
 from gui import Window
-import os
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
-import qdarkstyle
-import sys
 from PIL import Image
 import utils
 import io
@@ -21,9 +17,9 @@ class Controller():
         self.layerCount = 0
         self.view = view
         self.model = model
-        w, h = self.model.getSize()
+        self.w, self.h = self.model.getSize()
         bkgrnd = self.model.getDisplayImage()
-        self.view.createImagePanel(w, h, bkgrnd)
+        self.view.createImagePanel(self.w, self.h, bkgrnd)
         for _ in model.getAllImages():
             self.view.addLayer(0, self.layerCount)
             self.layerCount += 1
@@ -95,7 +91,6 @@ class Controller():
     def carveSeam(self):
         """
         Prompts user input for the target width and height, then carves seams down to the input dimensions
-        # WIP
         """
         maxWH = self.model.getSize()
         width = QInputDialog.getInt(self.view, 'Width Input', 'Enter taget image width (Pixels)\nEnter 0 to keep original image width', 
@@ -177,7 +172,7 @@ class Controller():
         """
         selected = self.selectLayer()
         w, h = self.model.getSize()
-        im = Image.new(mode="RGBA", size=(w, h), color=(255, 255, 255, 100))
+        im = Image.new(mode="RGBA", size=(w, h), color=(255, 255, 255, 0))
         self.model.addImage(im)
         self.view.addLayer(selected, self.layerCount)
         self.updateImage()
@@ -245,7 +240,7 @@ class Controller():
 
     def updateBrush(self):
         """
-        UPdates the hue and opacity of the brush and changes the preview square to match the new color
+        Updates the hue and opacity of the brush and changes the preview square to match the new color
         """
         color = self.view.colorCircle.getColor()
         brightness = self.view.brightnessSlider.value()/255
@@ -254,29 +249,35 @@ class Controller():
         b = int(color.blue()*brightness)
         a = self.view.opacitySlider.value()
         newColor = QColor(r, g, b, a)
-        self.view.canvas.setBrushColor(newColor)
+        self.view.scene.set_pen_color(newColor)
         self.view.changeSelectedColor(newColor)
 
     def updateBrushSize(self):
+        """
+        Changes the size of the drawing brush
+        """
         size = self.view.widthSlider.value()
-        self.view.canvas.setBrushSize(size)
+        self.view.scene.set_pen_size(size)
 
-    def updateBrushStroke(self):
-        top, i = self.model.getTopMost()
-        canvas = self.view.canvas.pixmap()
-        canvas = canvas.toImage()
-        buffer = QBuffer()
-        buffer.open(QBuffer.ReadWrite)
-        canvas.save(buffer, "PNG")
-        pil_im = Image.open(io.BytesIO(buffer.data()))
-        top.paste(pil_im, (0, 0), pil_im.convert('RGBA'))
-        self.model.layers[i] = top
+    def updateBrushStroke(self, stroke: QGraphicsPathItem):
+        """
+        Parameters
+        ============ 
+        stroke:
+            QGraphicsPathItem that contains the stroke path as well as information about the pen
 
-
-    #TODO:
-    # CHANGE THE WAY WE SHOW THE IMAGE TO ACCOUNT FOR TRANSPARENT PIXELS
-    # ADD DRAWING SUPPORT 
-    # CHANGE ADD LAYER TO ASK IF USER WANTS TO ADD EMPTY LAYER OR IMPORT AN IMAGE
+        connected to canvas edited. Takes the given brush stroke and adds it to the topmost model layer, then updates GUI
+        """
+        im, i = self.model.getTopMost()
+        pix = utils.toPixmap(im)
+        painter = QPainter(pix)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(stroke.pen())
+        painter.drawPath(stroke.path())
+        painter.end()
+        pil_im = utils.toPIL(pix)
+        self.model.layers[i] = pil_im
+        self.updateImage()
 
 
 
