@@ -111,7 +111,6 @@ class Window(QMainWindow):
         self.scene = PaintScene(utils.toPixmap(background), 0, 0, w, h, None)
         self.canvas = PaintView(self.scene)
         self.canvas.setRenderHint(QPainter.HighQualityAntialiasing)
-        self.canvas.mapToScene(0, 0, w, h)
         self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1)
         self.loadingLabel = QLabel()
         self.loadingLabel.setAlignment(Qt.AlignCenter)
@@ -210,12 +209,6 @@ class Window(QMainWindow):
         self.opacitySlider.setValue(255)
         self.opacitySlider.setTickPosition(QSlider.NoTicks)
 
-        self.hardnessSlider = QSlider(Qt.Horizontal)
-        self.hardnessSlider.setMinimum(0)
-        self.hardnessSlider.setMaximum(100)
-        self.hardnessSlider.setValue(75)
-        self.hardnessSlider.setTickPosition(QSlider.NoTicks)
-
         drawTabLayout.addWidget(colorLabel, 0, 0, 1, 2)
         drawTabLayout.addWidget(self.colorCircle, 1, 0, 2, 2)
         drawTabLayout.addWidget(self.selectedColorLabel, 2, 1)
@@ -227,8 +220,6 @@ class Window(QMainWindow):
         drawTabLayout.addWidget(self.brightnessSlider, 7, 0, 1, 2)
         drawTabLayout.addWidget(QLabel('Opacity:'), 8, 0)
         drawTabLayout.addWidget(self.opacitySlider, 9, 0, 1, 2)
-        drawTabLayout.addWidget(QLabel('Hardness:'),10, 0)
-        drawTabLayout.addWidget(self.hardnessSlider, 11, 0, 1, 2)
 
         tabs.addTab(filterTab, "Filter")
         tabs.addTab(drawTab, "Draw")
@@ -310,10 +301,10 @@ class Window(QMainWindow):
             PIL Image in any format
 
         Converts the given PIL image into a QPixmap, then displays is on the main image panel"""
-        self.canvas.clear()
+        self.scene.clear()
         if image is not None:
             image = utils.toPixmap(image)
-        self.canvas.setPixmap(image)
+        self.scene.setPixmap(image)
 
     def addLayer(self, index, layer):
         """
@@ -374,11 +365,11 @@ class Window(QMainWindow):
         self.layerList.itemMoved.connect(features.rearrangeLayers)
 
         self.colorCircle.currentColorChanged.connect(features.updateBrush)
-        #self.canvas.canvasEdited.connect(features.updateBrushStroke)
+        self.scene.canvasEdited.connect(features.updateBrushStroke)
         self.widthSlider.valueChanged.connect(features.updateBrushSize)
         self.brightnessSlider.valueChanged.connect(features.updateBrush)
         self.opacitySlider.valueChanged.connect(features.updateBrush)
-        self.hardnessSlider.valueChanged.connect(features.updateBrush)
+        #self.hardnessSlider.valueChanged.connect(features.updateBrushHardness)
 
 class LayerWidget(QWidget):
     """

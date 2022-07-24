@@ -27,7 +27,7 @@ class Controller():
         for _ in model.getAllImages():
             self.view.addLayer(0, self.layerCount)
             self.layerCount += 1
-        #self.updateImage()
+        self.updateImage()
         self.view.connect_features(self)
 
         # create settings to store data between sessions (optional add)

@@ -72,13 +72,11 @@ class GUIEditorModel:
         ============
         merges the current images in the model into a single image to be displayed in the GUI
         """
-        if not self.layers:
-            return 
         # set placeholder background
         background = Image.new(mode="RGBA", size=(self.width, self.height), color=(255, 255, 255, 0)) 
-        for i in range(len(self.layers), 0, -1):
-            if self.visibilityIdentifiers[i-1]:
-                foreground = self.getImageAt(i-1)
+        for i in range(len(self.layers)-1, -1, -1):
+            if self.visibilityIdentifiers[i]:
+                foreground = self.getImageAt(i)
                 background.paste(foreground, (0, 0), foreground.convert('RGBA'))
         return background
 
