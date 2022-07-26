@@ -6,6 +6,8 @@ from PyQt5.QtWidgets import *
 from PIL import Image
 import utils
 import io
+import h5py
+import numpy as np
 
 
 class Controller():
@@ -238,19 +240,37 @@ class Controller():
         self.model.changeVisibility()
         self.updateImage()
 
-    def newProject(self):
+    def saveImage(self, fileName):
         """
-        Creates new empty project *FORMAT TBD*
+        Saves all layers as one image in a
         """
-        return
+        image = self.model.getDisplayImage
+        image.save(fileName)
 
-    def openProject(self):
+    def saveProject(self, fileName):
         """
-        Opens a project in the editor's specific format
+        Saves the project as an HDF5
         """
-        return
+        images = self.model.getAllImages()
+        num_images = len(images)
+        file = h5py.File(fileName + ".h5", "w")
+        dataset = file.create_dataset("images", np.shape(images), h5py.h5t.STD_U8BE, data=images)
+        file.close()
 
-    # SAVE FUNCTIONS HERE
+
+    def openProject(self, fileName):
+        """
+        Opens a project from an HDF5
+        """
+        images = []
+        file = h5py.File(fileName, "r+")
+
+        images = np.array(file["/images"]).astype("uint8") 
+
+        self.model.removeAllImages()
+        for image in images:
+            self.model.addImage(image)
+
 
     def updateBrush(self):
         """
