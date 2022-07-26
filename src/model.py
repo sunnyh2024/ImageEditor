@@ -91,10 +91,10 @@ class GUIEditorModel:
         """
         Adds the given image to this model above the current selected layer.
         """
-        if len(self.layers) == 0 or image.height == self.height or image.width == self.width:
+        if len(self.layers) == 0 or (image.height == self.height and image.width == self.width):
             if len(self.layers) == 0:
-                self.height = len(image)
-                self.width = len(image[0])
+                self.height = image.height
+                self.width = image.width
             self.layers.insert(self.currentLayer, copy.deepcopy(image))
             self.visibilityIdentifiers.insert(self.currentLayer, True)
         else:

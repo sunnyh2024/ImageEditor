@@ -1,3 +1,4 @@
+from fileinput import filename
 from model import GUIEditorModel
 from gui import Window
 from PyQt5.QtCore import *
@@ -25,7 +26,6 @@ class Controller():
         for _ in model.getAllImages():
             self.view.addLayer(0, self.layerCount)
             self.layerCount += 1
-        self.updateImage()
         self.view.connect_features(self)
 
         # create settings to store data between sessions (optional add)
@@ -216,7 +216,6 @@ class Controller():
         """
         Updates the GUI's displayed image according to the topmost visible image in the model
         """
-        #img = self.model.getTopMost()
         img = self.model.getDisplayImage()
         self.view.updateImage(img)
 
@@ -240,37 +239,50 @@ class Controller():
         self.model.changeVisibility()
         self.updateImage()
 
-    def saveImage(self, fileName):
+    def saveImage(self):
         """
         Saves all layers as one image in a
         """
-        image = self.model.getDisplayImage
+        fileName = str(QFileDialog.getSaveFileName(self.view, 'Save Image', './', "Images (*.png *.xpm *.jpg)")[0])
+        image = self.model.getDisplayImage()
         image.save(fileName)
 
-    def saveProject(self, fileName):
+    def saveProject(self):
         """
         Saves the project as an HDF5
         """
-        images = self.model.getAllImages()
-        num_images = len(images)
+        fileName = str(QFileDialog.getSaveFileName(self.view, 'Save Project', './'))
+        if not fileName:
+            return
+        images = [np.asarray(im) for im in self.model.getAllImages()]
         file = h5py.File(fileName + ".h5", "w")
-        dataset = file.create_dataset("images", np.shape(images), h5py.h5t.STD_U8BE, data=images)
+        file.create_dataset("images", np.shape(images), h5py.h5t.STD_U8BE, data=images)
         file.close()
 
-
-    def openProject(self, fileName):
+    def openProject(self):
         """
         Opens a project from an HDF5
         """
-        images = []
+        fileName = str(QFileDialog.getOpenFileName(self.view, 'Open Project', './',"HDF5 files (*.hdf5, *.h5)")[0])
+        print(fileName)
+        if not fileName:
+            return
         file = h5py.File(fileName, "r+")
 
         images = np.array(file["/images"]).astype("uint8") 
 
         self.model.removeAllImages()
         for image in images:
-            self.model.addImage(image)
+            self.model.addImage(Image.fromarray(image))
+        self.updateImage()
 
+    def newProject(self):
+        fileName = str(QFileDialog.getOpenFileName(self.view, 'Open Image', './',"Images (*.png *.xpm *.jpg)")[0])
+        if not fileName:
+            return
+        image = Image.open(fileName)
+        self.model = GUIEditorModel(image)
+        self.updateImage()
 
     def updateBrush(self):
         """

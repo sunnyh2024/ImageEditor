@@ -75,6 +75,8 @@ class PaintScene(QGraphicsScene):
 
     def setPixmap(self, pixmap):
         self.background = self.addPixmap(pixmap)
+        self.setSceneRect(QRectF(0.0, 0.0, pixmap.width(), pixmap.height()))
+        self.update()
 
     @property
     def is_painting(self):

@@ -7,6 +7,9 @@ import sys
 import qdarkstyle
 from PIL import Image
 
+"""
+Main script to run for image editor
+"""
 if __name__ == '__main__':
     # set up the QApplication
     os.environ['QT_API'] = 'pyqt5'

@@ -336,6 +336,10 @@ class Window(QMainWindow):
         """
         Connects the buttons in this view to the given features (in this case will be the controller)
         """
+        self.newAct.triggered.connect(features.newProject)
+        self.openAct.triggered.connect(features.openProject)
+        self.saveAct.triggered.connect(features.saveProject)
+        self.saveAsAct.triggered.connect(features.saveImage)
         self.rotateAct.triggered.connect(features.rotateImages)
         self.horizFlipAct.triggered.connect(features.horizontalFlip)
         self.vertFlipAct.triggered.connect(features.verticalFlip)
