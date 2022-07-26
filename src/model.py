@@ -225,9 +225,9 @@ class GUIEditorModel:
         ansImg = np.array(self.getImageAt(self.currentLayer))
         for i in range(self.height):
             for j in range(self.width):
-                cluster = clusters[j, i]
+                cluster = clusters[i, j]
                 rgb = avgRGB[cluster]
-                ansImg[j, i] = (rgb[0], rgb[1], rgb[2])
+                ansImg[i, j] = (rgb[0], rgb[1], rgb[2])
         self.layers[self.currentLayer] = Image.fromarray(ansImg)
 
     def getAvgRGB(self, clusters, seeds, image):
@@ -252,8 +252,8 @@ class GUIEditorModel:
             totalPixels = 0
             for i in range(self.height):
                 for j in range(self.width):
-                    if clusters[j, i] == sdIndex:
-                        r, g, b = image[j, i, 0], image[j, i, 1], image[j, i, 2]
+                    if clusters[i, j] == sdIndex:
+                        r, g, b = image[i, j, 0], image[i, j, 1], image[i, j, 2]
                         clusterColors[sdIndex, 0] += r
                         clusterColors[sdIndex, 1] += g
                         clusterColors[sdIndex, 2] += b
@@ -289,7 +289,7 @@ class GUIEditorModel:
                     if tempDist < minDist:
                         minDist = tempDist
                         cluster = k
-                clusters[j, i] = cluster
+                clusters[i, j] = cluster
         return clusters
 
     def getSeeds(self, numSeeds):
