@@ -29,6 +29,20 @@ class Controller():
         # create settings to store data between sessions (optional add)
         self.settings = QSettings('session_data.ini', QSettings.IniFormat)
 
+    def load_model(self, new_model: GUIEditorModel):
+        """
+        sets the controller's model to the given new_model, and updates the gui to match the new model
+        """
+        self.model = new_model
+        self.w, self.h = self.model.getSize()
+        self.view.removeAllLayers()
+        self.layerCount = 0
+        for _ in self.model.getAllImages():
+            self.view.addLayer(0, self.layerCount)
+            self.layerCount += 1
+        self.view.scene.setSceneRect(0, 0, self.w, self.h)
+        self.updateImage()
+
     def blur(self):
         """
         Blurs the selected layer in the GUI
@@ -97,7 +111,7 @@ class Controller():
                                     min=0, max=maxWH[0])
         if not width[1]:
             return
-        height = QInputDialog.getInt(self.view, 'Width Input', 'Enter taget image width (Pixels)\nEnter 0 to keep original image height', 
+        height = QInputDialog.getInt(self.view, 'Width Input', 'Enter taget image height (Pixels)\nEnter 0 to keep original image height', 
                                      min=0, max=maxWH[1])
         if not height[1]:
             return

@@ -27,7 +27,6 @@ class Window(QMainWindow):
         self.createMenuBar()
         self.createDrawPanel()
         self.createLayerPanel()
-        self.createToolbar()
 
         self.t = None
 
@@ -92,11 +91,11 @@ class Window(QMainWindow):
         menuBar.addMenu(drawMenu)
         drawMenu.addAction("&For Future Use")
 
-        # viewMenu = QMenu("&View", self)
-        # menuBar.addMenu(viewMenu)
-        # modeMenu = viewMenu.addMenu('&Mode')
-        # modeMenu.addAction('Light')
-        # modeMenu.addAction('Dark')
+        viewMenu = QMenu("&View", self)
+        menuBar.addMenu(viewMenu)
+        modeMenu = viewMenu.addMenu('&Mode')
+        modeMenu.addAction('Light')
+        modeMenu.addAction('Dark')
 
         helpMenu = QMenu("&Help", self)
         menuBar.addMenu(helpMenu)
@@ -108,7 +107,7 @@ class Window(QMainWindow):
         """creates main image panel"""
         self.scene = PaintScene(utils.toPixmap(background), 0, 0, w, h, None)
         self.canvas = PaintView(self.scene)
-        self.canvas.setRenderHint(QPainter.HighQualityAntialiasing)
+        self.canvas.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform | QPainter.TextAntialiasing)
         self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1)
         self.loadingLabel = QLabel()
         self.loadingLabel.setAlignment(Qt.AlignCenter)
@@ -318,6 +317,7 @@ class Window(QMainWindow):
         self.layerList.insertItem(index, item)
         self.layerList.setItemWidget(item, widget)
         item.setSizeHint(widget.sizeHint())
+        self.layerList.setCurrentRow(index)
     
     def removeLayer(self, index):
         """
@@ -376,13 +376,10 @@ class LayerWidget(QWidget):
         layout = QHBoxLayout()
         self.setLayout(layout)
 
-        # self.visibility = QCheckBox()
-        # self.visibility.setChecked(True)
         self.namelabel = QLineEdit(name)
         self.namelabel.setFrame(False)
         spacer = QSpacerItem(80, 25, QSizePolicy.Minimum, QSizePolicy.Expanding) 
 
-        #layout.addWidget(self.visibility)
         layout.addWidget(self.namelabel)
         layout.addItem(spacer)
 

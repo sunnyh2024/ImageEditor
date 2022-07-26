@@ -15,6 +15,7 @@ class GUIEditorModel:
         self.layers = []
         self.visibilityIdentifiers = []
         self.currentLayer = -1
+        self.width, self.height = 512, 512
         if len(images) > 0:
             self.height = images[0].height
             self.width = images[0].width
@@ -33,8 +34,6 @@ class GUIEditorModel:
         tuple representing the width and the height of the images in the current project.
         (defaults to 512 pixels)
         """
-        if not (self.width and self.height):
-            self.width = self.height = 512
         return self.width, self.height
 
     def getAllImages(self):
@@ -125,6 +124,7 @@ class GUIEditorModel:
         Moves the image current at the given start index to the given end index
         """
         self.layers.insert(end, self.layers.pop(start))
+        self.visibilityIdentifiers.insert(end, self.visibilityIdentifiers.pop(start))
 
     def selectLayer(self, index):
         """

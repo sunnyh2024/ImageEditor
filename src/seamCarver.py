@@ -176,16 +176,13 @@ def carveSeam(image, targetWidth, targetHeight):
         image = removeSeam(image, seam, r)
         shape = list(image.shape)
     while shape[1] > targetWidth:
-        c = time.time()
-        print(c - start)
-        start = c
         seam = findLowestSeam(image, 1)
         c = time.time()
-        print('find: ', c - start)
+        print('find seam time: ', c - start)
         start = c
         image = removeSeam(image, seam, 1)
         c = time.time()
-        print('remove: ', c - start)
+        print('remove seam time: ', c - start)
         start = c
         shape = list(image.shape)
     while shape[0] > targetHeight:

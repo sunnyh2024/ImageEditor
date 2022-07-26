@@ -47,7 +47,7 @@ class PaintScene(QGraphicsScene):
         self._is_painting = False
 
         # brush properites
-        self.pen_size = 30
+        self.pen_size = 5
         self.pen_color = QColor(255, 255, 255, 255)
         self.pen_blur = 25
         self.pen_opacity = 100
@@ -57,14 +57,14 @@ class PaintScene(QGraphicsScene):
                          Qt.SolidLine, Qt.RoundCap,
                          Qt.RoundJoin) 
         brush = QBrush(QColor(0, 0, 0, 0), Qt.SolidPattern)
-        self._cursor_outline = self.addEllipse(-15, -15, 30, 30, pen, brush)
+        self._cursor_outline = self.addEllipse(-2.5, -2.5, 5, 5, pen, brush)
 
         pen = QPen(QColor(255, 255, 255, 0), 1,
                          Qt.SolidLine, Qt.RoundCap,
                          Qt.RoundJoin)
         brush = QBrush(QColor(255, 255, 255, 127),
                              Qt.SolidPattern)
-        self._cursor_fill = self.addEllipse(-15, -15, 30, 30, pen, brush)
+        self._cursor_fill = self.addEllipse(-2.5, -2.5, 5, 5, pen, brush)
         self._cursor_fill.setOpacity(0)
 
         self._cursor_fill.setZValue(1000)
