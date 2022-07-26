@@ -17,8 +17,8 @@ if __name__ == '__main__':
     app.setStyle('Fusion')
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    amongus = Image.open('amongus.png')
-    tower = Image.open('tower.png')
+    amongus = Image.open('test/amongus.png')
+    tower = Image.open('test/tower.png')
     blank = Image.new(mode="RGBA", size=(512, 512), color=(255, 255, 255, 0))
 
     screen_res = app.desktop().screenGeometry()
