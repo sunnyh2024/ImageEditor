@@ -2,31 +2,33 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from colorcircle import ColorCircle
-from canvas import Canvas
+from canvas import PaintScene, PaintView
 import utils
 import itertools
 import time
 import threading
 
 class Window(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, w, h, parent=None):
         super().__init__(parent)
 
         self.setWindowTitle("PyEditor")
         self.setWindowIcon(QIcon('icons/logo.png'))
-        self.setGeometry(400, 200, 1600, 900)
+        self.setGeometry(400, 200, w, h)
 
         self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
 
         self.gridLayout = QGridLayout(self.centralWidget)
         self.gridLayout.setColumnMinimumWidth(1, 300)
+        self.gridLayout.setColumnStretch(1, 1)
+        self.gridLayout.setColumnStretch(3, 0)
 
         self.createMenuBar()
         self.createDrawPanel()
-        #self.createImagePanel()
         self.createLayerPanel()
-        self.createToolbar()
+
+        self.t = None
 
     def createMenuBar(self):
         """Creates the top menu bar with the File, Image, Draw and Help Menus"""
@@ -89,11 +91,11 @@ class Window(QMainWindow):
         menuBar.addMenu(drawMenu)
         drawMenu.addAction("&For Future Use")
 
-        # viewMenu = QMenu("&View", self)
-        # menuBar.addMenu(viewMenu)
-        # modeMenu = viewMenu.addMenu('&Mode')
-        # modeMenu.addAction('Light')
-        # modeMenu.addAction('Dark')
+        viewMenu = QMenu("&View", self)
+        menuBar.addMenu(viewMenu)
+        modeMenu = viewMenu.addMenu('&Mode')
+        modeMenu.addAction('Light')
+        modeMenu.addAction('Dark')
 
         helpMenu = QMenu("&Help", self)
         menuBar.addMenu(helpMenu)
@@ -103,19 +105,10 @@ class Window(QMainWindow):
 
     def createImagePanel(self, w, h, background):
         """creates main image panel"""
-        leftSpacer = QLabel()
-        leftSpacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.gridLayout.addWidget(leftSpacer, 0, 0, 3, 1)
-        # self.workspace = WorkSpace(w, h, background)
-        # self.gridLayout.addWidget(self.workspace, 0, 1, 3, 1, alignment=Qt.AlignCenter)
-        self.background = QLabel()
-        self.background.setPixmap(utils.toPixmap(background))
-        self.gridLayout.addWidget(self.background, 0, 1, 3, 1, alignment=Qt.AlignCenter)
-        self.canvas = Canvas(w, h)
-        self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1, alignment=Qt.AlignCenter)
-        rightSpacer = QLabel()
-        rightSpacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.gridLayout.addWidget(rightSpacer, 0, 2, 3, 1)
+        self.scene = PaintScene(utils.toPixmap(background), 0, 0, w, h, None)
+        self.canvas = PaintView(self.scene)
+        self.canvas.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform | QPainter.TextAntialiasing)
+        self.gridLayout.addWidget(self.canvas, 0, 1, 3, 1)
         self.loadingLabel = QLabel()
         self.loadingLabel.setAlignment(Qt.AlignCenter)
         self.loadingLabel.setStyleSheet("background-color: rgba(0, 0, 0, 150); font-size: 16pt;")
@@ -213,12 +206,6 @@ class Window(QMainWindow):
         self.opacitySlider.setValue(255)
         self.opacitySlider.setTickPosition(QSlider.NoTicks)
 
-        self.hardnessSlider = QSlider(Qt.Horizontal)
-        self.hardnessSlider.setMinimum(0)
-        self.hardnessSlider.setMaximum(100)
-        self.hardnessSlider.setValue(75)
-        self.hardnessSlider.setTickPosition(QSlider.NoTicks)
-
         drawTabLayout.addWidget(colorLabel, 0, 0, 1, 2)
         drawTabLayout.addWidget(self.colorCircle, 1, 0, 2, 2)
         drawTabLayout.addWidget(self.selectedColorLabel, 2, 1)
@@ -230,8 +217,6 @@ class Window(QMainWindow):
         drawTabLayout.addWidget(self.brightnessSlider, 7, 0, 1, 2)
         drawTabLayout.addWidget(QLabel('Opacity:'), 8, 0)
         drawTabLayout.addWidget(self.opacitySlider, 9, 0, 1, 2)
-        drawTabLayout.addWidget(QLabel('Hardness:'),10, 0)
-        drawTabLayout.addWidget(self.hardnessSlider, 11, 0, 1, 2)
 
         tabs.addTab(filterTab, "Filter")
         tabs.addTab(drawTab, "Draw")
@@ -283,10 +268,8 @@ class Window(QMainWindow):
         """creates the left-hand tool bar (similar to PS) which will include brush, hand, lasso, and other tools"""
         editTools = QToolBar('Tools')
         editTools.setMovable(False)
-        # spacer widget for left
         top_spacer = QWidget()
         top_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # spacer widget for right
         bottom_spacer = QWidget()
         bottom_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -313,10 +296,10 @@ class Window(QMainWindow):
             PIL Image in any format
 
         Converts the given PIL image into a QPixmap, then displays is on the main image panel"""
-        self.canvas.clear()
+        self.scene.clear()
         if image is not None:
             image = utils.toPixmap(image)
-        self.canvas.setPixmap(image)
+        self.scene.setPixmap(image)
 
     def addLayer(self, index, layer):
         """
@@ -334,6 +317,7 @@ class Window(QMainWindow):
         self.layerList.insertItem(index, item)
         self.layerList.setItemWidget(item, widget)
         item.setSizeHint(widget.sizeHint())
+        self.layerList.setCurrentRow(index)
     
     def removeLayer(self, index):
         """
@@ -352,6 +336,10 @@ class Window(QMainWindow):
         """
         Connects the buttons in this view to the given features (in this case will be the controller)
         """
+        self.newAct.triggered.connect(features.newProject)
+        self.openAct.triggered.connect(features.openProject)
+        self.saveAct.triggered.connect(features.saveProject)
+        self.saveAsAct.triggered.connect(features.saveImage)
         self.rotateAct.triggered.connect(features.rotateImages)
         self.horizFlipAct.triggered.connect(features.horizontalFlip)
         self.vertFlipAct.triggered.connect(features.verticalFlip)
@@ -377,11 +365,10 @@ class Window(QMainWindow):
         self.layerList.itemMoved.connect(features.rearrangeLayers)
 
         self.colorCircle.currentColorChanged.connect(features.updateBrush)
-        self.canvas.canvasEdited.connect(features.updateBrushStroke)
+        self.scene.canvasEdited.connect(features.updateBrushStroke)
         self.widthSlider.valueChanged.connect(features.updateBrushSize)
         self.brightnessSlider.valueChanged.connect(features.updateBrush)
         self.opacitySlider.valueChanged.connect(features.updateBrush)
-        self.hardnessSlider.valueChanged.connect(features.updateBrush)
 
 class LayerWidget(QWidget):
     """
@@ -393,13 +380,10 @@ class LayerWidget(QWidget):
         layout = QHBoxLayout()
         self.setLayout(layout)
 
-        # self.visibility = QCheckBox()
-        # self.visibility.setChecked(True)
         self.namelabel = QLineEdit(name)
         self.namelabel.setFrame(False)
         spacer = QSpacerItem(80, 25, QSizePolicy.Minimum, QSizePolicy.Expanding) 
 
-        #layout.addWidget(self.visibility)
         layout.addWidget(self.namelabel)
         layout.addItem(spacer)
 

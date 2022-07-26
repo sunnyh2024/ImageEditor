@@ -1,15 +1,14 @@
-from turtle import bk
+from fileinput import filename
 from model import GUIEditorModel
 from gui import Window
-import os
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
-import qdarkstyle
-import sys
 from PIL import Image
 import utils
 import io
+import h5py
+import numpy as np
 
 
 class Controller():
@@ -21,17 +20,30 @@ class Controller():
         self.layerCount = 0
         self.view = view
         self.model = model
-        w, h = self.model.getSize()
+        self.w, self.h = self.model.getSize()
         bkgrnd = self.model.getDisplayImage()
-        self.view.createImagePanel(w, h, bkgrnd)
+        self.view.createImagePanel(self.w, self.h, bkgrnd)
         for _ in model.getAllImages():
             self.view.addLayer(0, self.layerCount)
             self.layerCount += 1
-        self.updateImage()
         self.view.connect_features(self)
 
         # create settings to store data between sessions (optional add)
         self.settings = QSettings('session_data.ini', QSettings.IniFormat)
+
+    def load_model(self, new_model: GUIEditorModel):
+        """
+        sets the controller's model to the given new_model, and updates the gui to match the new model
+        """
+        self.model = new_model
+        self.w, self.h = self.model.getSize()
+        self.view.removeAllLayers()
+        self.layerCount = 0
+        for _ in self.model.getAllImages():
+            self.view.addLayer(0, self.layerCount)
+            self.layerCount += 1
+        self.view.scene.setSceneRect(0, 0, self.w, self.h)
+        self.updateImage()
 
     def blur(self):
         """
@@ -77,6 +89,8 @@ class Controller():
             return
         numseeds = numseeds[0]
         # Setting up thread (mosaic takes too long and freezes GUI)
+        if self.view.t:
+            return 
         self.view.t = QThread()
         self.view.worker = utils.MosaicWorker(self.model, numseeds)
         # create worker and move to thread
@@ -85,7 +99,6 @@ class Controller():
         self.view.worker.finished.connect(self.view.t.quit)
         self.view.worker.finished.connect(self.view.worker.deleteLater)
         self.view.t.finished.connect(self.view.t.deleteLater)
-        self.view.t.finished.connect(lambda: print('Finished mosaic'))
         self.view.t.finished.connect(self.updateImage)
         self.view.t.finished.connect(self.view.removeLoadScreen)
         self.view.loadScreen() # let user know that process is running
@@ -94,20 +107,34 @@ class Controller():
     def carveSeam(self):
         """
         Prompts user input for the target width and height, then carves seams down to the input dimensions
-        # WIP
         """
         maxWH = self.model.getSize()
         width = QInputDialog.getInt(self.view, 'Width Input', 'Enter taget image width (Pixels)\nEnter 0 to keep original image width', 
                                     min=0, max=maxWH[0])
         if not width[1]:
             return
-        height = QInputDialog.getInt(self.view, 'Width Input', 'Enter taget image width (Pixels)\nEnter 0 to keep original image height', 
+        height = QInputDialog.getInt(self.view, 'Width Input', 'Enter taget image height (Pixels)\nEnter 0 to keep original image height', 
                                      min=0, max=maxWH[1])
         if not height[1]:
             return
         w = width[0] if width[0] else maxWH[0]
         h = height[0] if height[0] else maxWH[1]
-        print('carving seams', w, h)
+        # Setting up thread (mosaic takes too long and freezes GUI)
+        if self.view.t:
+            return 
+        self.view.t = QThread()
+        self.view.worker = utils.SeamCarveWorker(self.model, w, h)
+        # create worker and move to thread
+        self.view.worker.moveToThread(self.view.t)
+        self.view.t.started.connect(self.view.worker.run)
+        self.view.worker.progress.connect(lambda i: print(f'carving for layer {i} completed'))
+        self.view.worker.finished.connect(self.view.t.quit)
+        self.view.worker.finished.connect(self.view.worker.deleteLater)
+        self.view.t.finished.connect(self.view.t.deleteLater)
+        self.view.t.finished.connect(self.updateImage)
+        self.view.t.finished.connect(self.view.removeLoadScreen)
+        self.view.loadScreen() # let user know that process is running
+        self.view.t.start()
 
     def rotateImages(self):
         """
@@ -161,7 +188,7 @@ class Controller():
         """
         selected = self.selectLayer()
         w, h = self.model.getSize()
-        im = Image.new(mode="RGBA", size=(w, h), color=(255, 255, 255, 100))
+        im = Image.new(mode="RGBA", size=(w, h), color=(255, 255, 255, 0))
         self.model.addImage(im)
         self.view.addLayer(selected, self.layerCount)
         self.updateImage()
@@ -189,7 +216,6 @@ class Controller():
         """
         Updates the GUI's displayed image according to the topmost visible image in the model
         """
-        #img = self.model.getTopMost()
         img = self.model.getDisplayImage()
         self.view.updateImage(img)
 
@@ -213,23 +239,54 @@ class Controller():
         self.model.changeVisibility()
         self.updateImage()
 
-    def newProject(self):
+    def saveImage(self):
         """
-        Creates new empty project *FORMAT TBD*
+        Saves all layers as one image in a
         """
-        return
+        fileName = str(QFileDialog.getSaveFileName(self.view, 'Save Image', './', "Images (*.png *.xpm *.jpg)")[0])
+        image = self.model.getDisplayImage()
+        image.save(fileName)
+
+    def saveProject(self):
+        """
+        Saves the project as an HDF5
+        """
+        fileName = str(QFileDialog.getSaveFileName(self.view, 'Save Project', './'))
+        if not fileName:
+            return
+        images = [np.asarray(im) for im in self.model.getAllImages()]
+        file = h5py.File(fileName + ".h5", "w")
+        file.create_dataset("images", np.shape(images), h5py.h5t.STD_U8BE, data=images)
+        file.close()
 
     def openProject(self):
         """
-        Opens a project in the editor's specific format
+        Opens a project from an HDF5
         """
-        return
+        fileName = str(QFileDialog.getOpenFileName(self.view, 'Open Project', './',"HDF5 files (*.hdf5, *.h5)")[0])
+        print(fileName)
+        if not fileName:
+            return
+        file = h5py.File(fileName, "r+")
 
-    # SAVE FUNCTIONS HERE
+        images = np.array(file["/images"]).astype("uint8") 
+
+        self.model.removeAllImages()
+        for image in images:
+            self.model.addImage(Image.fromarray(image))
+        self.updateImage()
+
+    def newProject(self):
+        fileName = str(QFileDialog.getOpenFileName(self.view, 'Open Image', './',"Images (*.png *.xpm *.jpg)")[0])
+        if not fileName:
+            return
+        image = Image.open(fileName)
+        self.model = GUIEditorModel(image)
+        self.updateImage()
 
     def updateBrush(self):
         """
-        UPdates the hue and opacity of the brush and changes the preview square to match the new color
+        Updates the hue and opacity of the brush and changes the preview square to match the new color
         """
         color = self.view.colorCircle.getColor()
         brightness = self.view.brightnessSlider.value()/255
@@ -238,29 +295,35 @@ class Controller():
         b = int(color.blue()*brightness)
         a = self.view.opacitySlider.value()
         newColor = QColor(r, g, b, a)
-        self.view.canvas.setBrushColor(newColor)
+        self.view.scene.set_pen_color(newColor)
         self.view.changeSelectedColor(newColor)
 
     def updateBrushSize(self):
+        """
+        Changes the size of the drawing brush
+        """
         size = self.view.widthSlider.value()
-        self.view.canvas.setBrushSize(size)
+        self.view.scene.set_pen_size(size)
 
-    def updateBrushStroke(self):
-        top, i = self.model.getTopMost()
-        canvas = self.view.canvas.pixmap()
-        canvas = canvas.toImage()
-        buffer = QBuffer()
-        buffer.open(QBuffer.ReadWrite)
-        canvas.save(buffer, "PNG")
-        pil_im = Image.open(io.BytesIO(buffer.data()))
-        top.paste(pil_im, (0, 0), pil_im.convert('RGBA'))
-        self.model.layers[i] = top
+    def updateBrushStroke(self, stroke: QGraphicsPathItem):
+        """
+        Parameters
+        ============ 
+        stroke:
+            QGraphicsPathItem that contains the stroke path as well as information about the pen
 
-
-    #TODO:
-    # CHANGE THE WAY WE SHOW THE IMAGE TO ACCOUNT FOR TRANSPARENT PIXELS
-    # ADD DRAWING SUPPORT 
-    # CHANGE ADD LAYER TO ASK IF USER WANTS TO ADD EMPTY LAYER OR IMPORT AN IMAGE
+        connected to canvas edited. Takes the given brush stroke and adds it to the topmost model layer, then updates GUI
+        """
+        im, i = self.model.getTopMost()
+        pix = utils.toPixmap(im)
+        painter = QPainter(pix)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(stroke.pen())
+        painter.drawPath(stroke.path())
+        painter.end()
+        pil_im = utils.toPIL(pix)
+        self.model.layers[i] = pil_im
+        self.updateImage()
 
 
 

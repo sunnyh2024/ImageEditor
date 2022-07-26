@@ -15,6 +15,7 @@ class GUIEditorModel:
         self.layers = []
         self.visibilityIdentifiers = []
         self.currentLayer = -1
+        self.width, self.height = 512, 512
         if len(images) > 0:
             self.height = images[0].height
             self.width = images[0].width
@@ -33,8 +34,6 @@ class GUIEditorModel:
         tuple representing the width and the height of the images in the current project.
         (defaults to 512 pixels)
         """
-        if not (self.width and self.height):
-            self.width = self.height = 512
         return self.width, self.height
 
     def getAllImages(self):
@@ -72,13 +71,11 @@ class GUIEditorModel:
         ============
         merges the current images in the model into a single image to be displayed in the GUI
         """
-        if not self.layers:
-            return 
         # set placeholder background
         background = Image.new(mode="RGBA", size=(self.width, self.height), color=(255, 255, 255, 0)) 
-        for i in range(len(self.layers), 0, -1):
-            if self.visibilityIdentifiers[i-1]:
-                foreground = self.getImageAt(i-1)
+        for i in range(len(self.layers)-1, -1, -1):
+            if self.visibilityIdentifiers[i]:
+                foreground = self.getImageAt(i)
                 background.paste(foreground, (0, 0), foreground.convert('RGBA'))
         return background
 
@@ -94,10 +91,10 @@ class GUIEditorModel:
         """
         Adds the given image to this model above the current selected layer.
         """
-        if len(self.layers) == 0 or image.height == self.height or image.width == self.width:
+        if len(self.layers) == 0 or (image.height == self.height and image.width == self.width):
             if len(self.layers) == 0:
-                self.height = len(image)
-                self.width = len(image[0])
+                self.height = image.height
+                self.width = image.width
             self.layers.insert(self.currentLayer, copy.deepcopy(image))
             self.visibilityIdentifiers.insert(self.currentLayer, True)
         else:
@@ -127,6 +124,7 @@ class GUIEditorModel:
         Moves the image current at the given start index to the given end index
         """
         self.layers.insert(end, self.layers.pop(start))
+        self.visibilityIdentifiers.insert(end, self.visibilityIdentifiers.pop(start))
 
     def selectLayer(self, index):
         """

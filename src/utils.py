@@ -1,9 +1,8 @@
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, QBuffer
 from PyQt5.QtGui import QImage, QPixmap
-import itertools
-import sys
-import time
-import threading
+from seamCarver import carveSeam
+from PIL import Image
+import io
 
 
 def getDistance(posn1, posn2):
@@ -13,14 +12,27 @@ def getDistance(posn1, posn2):
     return (distX + distY) ** 0.5
 
 def toPixmap(image):
-    if image:
-        im = image.convert("RGBA")
-        data = im.tobytes("raw","RGBA")
-        qim = QImage(data, im.size[0], im.size[1], QImage.Format_RGBA8888)
-        pix = QPixmap(qim)
-        return pix
+    if not image:
+        return
+    im = image.convert("RGBA")
+    data = im.tobytes("raw","RGBA")
+    qim = QImage(data, im.size[0], im.size[1], QImage.Format_RGBA8888)
+    pix = QPixmap(qim)
+    return pix
+
+def toPIL(pixmap: QPixmap):
+    if not pixmap:
+        return
+    qim = pixmap.toImage()
+    buffer = QBuffer()
+    buffer.open(QBuffer.ReadWrite)
+    qim.save(buffer, 'PNG')
+    return Image.open(io.BytesIO(buffer.data()))
 
 class MosaicWorker(QObject):
+    """
+    worker that runs the mosaic filter. Used with the QThread to prevent GUI freezing
+    """
     finished = pyqtSignal()
 
     def __init__(self, model, numseeds, parent=None):
@@ -33,27 +45,21 @@ class MosaicWorker(QObject):
        self.finished.emit()
 
 class SeamCarveWorker(QObject):
+    """
+    worker that carves seams. Used with the QThread to prevent GUI freezing
+    """
     finished = pyqtSignal()
     progress = pyqtSignal(int)
 
-    def __init__(self, parent=None):
+    def __init__(self, model, width, height, parent=None):
         super().__init__(parent)
-        self.placeholder = 'test'
+        self.width = width
+        self.height = height
+        self.model = model
 
-# done = False
-# #here is the animation
-# def animate():
-#     for c in itertools.cycle(['|', '/', '-', '\\']):
-#         if done:
-#             break
-#         sys.stdout.write('\rloading ' + c)
-#         sys.stdout.flush()
-#         time.sleep(0.1)
-#     sys.stdout.write('\rDone!     ')
-
-# t = threading.Thread(target=animate)
-# t.start()
-
-# #long process here
-# time.sleep(10)
-# done = True
+    def run(self):
+        for count, image in enumerate(self.model.getAllImages()):
+            newImage = Image.fromarray(carveSeam(image, self.width, self.height))
+            self.model.layers[count] = newImage
+            self.progress.emit(count)
+        self.finished.emit()
