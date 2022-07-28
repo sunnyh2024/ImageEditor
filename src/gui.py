@@ -227,6 +227,9 @@ class Window(QMainWindow):
         self.gridLayout.addWidget(drawPanel, 0, 3)
 
     def changeSelectedColor(self, newColor):
+        """
+        change the selected color preview the given color
+        """
         newLabel = QPixmap(30, 30)
         newLabel.fill(newColor)
         self.selectedColorLabel.setPixmap(newLabel)
@@ -297,7 +300,7 @@ class Window(QMainWindow):
         image:
             PIL Image in any format
 
-        Converts the given PIL image into a QPixmap, then displays is on the main image panel"""
+        Converts the given PIL image into a QPixmap, then displays it on the canvas"""
         self.scene.clear()
         if image is not None:
             image = utils.toPixmap(image)
